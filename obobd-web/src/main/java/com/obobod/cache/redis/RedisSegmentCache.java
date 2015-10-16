@@ -12,7 +12,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class RedisSegmentCache implements SegmentCache {
 
-    private static final Logger log = Logger.getLogger(RedisSegmentCache.class);
+    private static final Logger logger = Logger.getLogger(RedisSegmentCache.class);
     private final List<SegmentCacheListener> listeners =
             new CopyOnWriteArrayList<SegmentCacheListener>();
 
@@ -26,16 +26,22 @@ public class RedisSegmentCache implements SegmentCache {
             return null;
 
         final byte[] ref = getCache().get(getHeaderKey(header));
+
+        if(ref ==null){
+            return null;
+        }
+
         final SegmentBody body = (SegmentBody) SerializeUtil.unserialize(ref);
+
         if (body == null) {
             return null;
         } else {
             Map valuemap = body.getValueMap();
             if (valuemap == null || valuemap.size() == 0) {
                 this.remove(header);
-                log.info("RedisSegmentCache execute valuemap==null||valuemap.size()==0,this.remove(header)!");
+                logger.info("RedisSegmentCache execute valuemap==null||valuemap.size()==0,this.remove(header)!");
             } else {
-                log.info("RedisSegmentCache execute get sucess!");
+                logger.info("RedisSegmentCache execute get sucess!");
             }
 
         }
@@ -56,11 +62,11 @@ public class RedisSegmentCache implements SegmentCache {
             try {
                 this.remove(header);
             } catch (Exception e) {
-                log.error("SegmentBody contains error：" + e.getMessage());
+                logger.error("SegmentBody contains error：" + e.getMessage());
             }
             return false;
         }
-        log.info("RedisSegmentCache execute contains sucess!");
+        logger.info("RedisSegmentCache execute contains sucess!");
         return true;
     }
 
@@ -74,12 +80,12 @@ public class RedisSegmentCache implements SegmentCache {
                 retList.add((SegmentHeader)SerializeUtil.unserialize(i.next().getBytes()));
             }
 
-            log.info("获得Segement headers"+ retList.size());
+            logger.info("获得Segement headers" + retList.size());
             return retList;
 
 
         } catch ( Exception e ) {
-            log.error( e );
+            logger.error(e);
             return Collections.emptyList();
         }
 
@@ -93,7 +99,7 @@ public class RedisSegmentCache implements SegmentCache {
         try {
             getCache().put(getHeaderKey(header), SerializeUtil.serialize(body));
         } catch (Exception e) {
-            log.error("SegmentBody put error：" + e.getMessage());
+            logger.error("SegmentBody put error：" + e.getMessage());
         }
         fireSegmentCacheEvent(
                 new SegmentCache.SegmentCacheListener.SegmentCacheEvent() {
@@ -110,7 +116,7 @@ public class RedisSegmentCache implements SegmentCache {
                                 .EventType.ENTRY_CREATED;
                     }
                 });
-        log.info("RedisSegmentCache execute put sucess!");
+        logger.info("RedisSegmentCache execute put sucess!");
         return true; // success
     }
 
@@ -141,9 +147,9 @@ public class RedisSegmentCache implements SegmentCache {
                     });
 //	        }
         } catch (Exception e) {
-            log.error("SegmentBody remove error：" + e.getMessage());
+            logger.error("SegmentBody remove error：" + e.getMessage());
         }
-        log.info("RedisSegmentCache execute remove sucess!");
+        logger.info("RedisSegmentCache execute remove sucess!");
         return result;
     }
 
@@ -156,7 +162,7 @@ public class RedisSegmentCache implements SegmentCache {
 
         getCache().clear();
         listeners.clear();
-        log.info("RedisSegmentCache execute tearDown sucess!");
+        logger.info("RedisSegmentCache execute tearDown sucess!");
     }
 
     public void addListener(SegmentCacheListener listener) {
