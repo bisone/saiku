@@ -100,7 +100,7 @@ public class JdbcUserDAO
     {
         String sql = prop.getProperty("getRole");
         String roles =
-            getJdbcTemplate().queryForObject(sql, new Object[] { user.getId() }, String.class);
+            getJdbcTemplate().queryForObject(sql, new Object[]{user.getId()}, String.class);
         if (roles != null)
         {
             List<String> list = new ArrayList(Arrays.asList(roles.split(",")));
@@ -116,6 +116,14 @@ public class JdbcUserDAO
         return (SaikuUser) getJdbcTemplate().query(prop.getProperty("getUserById"),
             new Object[] { userId }, new UserMapper()).get(0);
     }
+
+    public SaikuUser findByUserName(String userName)
+    {
+
+        return (SaikuUser) getJdbcTemplate().query(prop.getProperty("getUserByName"),
+                new Object[] { userName }, new UserMapper()).get(0);
+    }
+
 
     public Collection findAllUsers()
     {

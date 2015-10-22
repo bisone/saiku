@@ -81,6 +81,10 @@ public class UserService implements IUserManager, Serializable {
         return uDAO.findByUserId(id);
     }
 
+    public SaikuUser getUser(String userName) {
+        return uDAO.findByUserName(userName);
+    }
+
     public String[] getRoles(SaikuUser user) {
         return uDAO.getRoles(user);
     }
