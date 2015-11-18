@@ -30,7 +30,7 @@
         <!-- -->
     <!--</bean>-->
 
-    <bean id="mySQLdatabase" class="org.saiku.database.MySQLDatabase" init-method="init">
+    <bean id="mySQLdatabase" class="com.bisone.saiku.MySQLDatabase" init-method="init">
         <property name="datasourceManager" ref="repositoryDsManager"/>
         <property name="dataSource" ref="dataSource"/>
     </bean>

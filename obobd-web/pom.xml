@@ -8,10 +8,10 @@
     <version>3.5</version>
   </parent>
   <groupId>com.github.bisone</groupId>
-  <artifactId>ui-webapp</artifactId>
+  <artifactId>obobd-web</artifactId>
   <version>3.5</version>
   <packaging>war</packaging>
-  <name>ui-webapp Maven Webapp</name>
+  <name>obobd-web Maven Webapp</name>
   <url>http://maven.apache.org</url>
   <properties>
     <maven.surefire.plugin.version>2.17</maven.surefire.plugin.version>
@@ -28,6 +28,12 @@
     <dependency>
       <groupId>org.saiku</groupId>
       <artifactId>saiku-web</artifactId>
+      <exclusions>
+        <exclusion>
+          <artifactId>log4j-over-slf4j</artifactId>
+          <groupId>org.slf4j</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.h2database</groupId>
@@ -91,10 +97,7 @@
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.springframework.security</groupId>
-      <artifactId>spring-security-cas</artifactId>
-    </dependency>
+
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-taglibs</artifactId>
@@ -133,10 +136,22 @@
       <groupId>org.apache.jackrabbit</groupId>
       <artifactId>jackrabbit-jcr-servlet</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.springframework.data</groupId>
+      <artifactId>spring-data-redis</artifactId>
+      <version>1.6.0.RELEASE</version>
+    </dependency>
+    <dependency>
+      <groupId>redis.clients</groupId>
+      <artifactId>jedis</artifactId>
+      <version>2.2.1</version>
+      <type>jar</type>
+      <scope>compile</scope>
+    </dependency>
     
   </dependencies>
   <build>
-    <finalName>ui-webapp</finalName>
+    <finalName>obobd-web</finalName>
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>
  
@@ -181,7 +196,6 @@
       <plugin>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-maven-plugin</artifactId>
-        <version>9.1.3.v20140225</version>
         <configuration>
           <contextXml>${basedir}/src/main/webapp/WEB-INF/jetty-context.xml</contextXml>
           <stopKey>CTRL+C</stopKey>
@@ -199,6 +213,7 @@
 
         </configuration>
       </plugin>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
@@ -232,14 +247,16 @@
         <repoconfig>configuration-mysql.xml</repoconfig>
 
         <!-- <repoconfig>/home/will/backup/repository/configuration.xml</repoconfig> -->
-        <repodata>/home/will/backup/repository/data</repodata>
+        <repodata>repository/data</repodata>
         <foodmartrepo>/home/will/backup/data</foodmartrepo>
         <foodmartschema>/home/will/backup/data/FoodMart4.xml</foodmartschema>
         <foodmarturl>jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8</foodmarturl>
         <earthquakerepo>/home/will/backup/data</earthquakerepo>
         <earthquakeschema>/home/will/backup/data/Earthquakes.xml</earthquakeschema>
         <earthquakeurl>jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8</earthquakeurl>
-        <pluginpath>/home/will/saiku/saiku-ui/js/saiku/plugins/</pluginpath>
+        <pluginpath>../saiku-ui/js/saiku/plugins/</pluginpath>
+
+        <redis.host-name>redis.local</redis.host-name>
 
         
       </properties>
@@ -266,7 +283,7 @@
                   <goal>copy-resources</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>${basedir}/target/ui-webapp/WEB-INF</outputDirectory>
+                  <outputDirectory>${basedir}/target/obobd-web/WEB-INF</outputDirectory>
                   <resources>
                     <resource>
                       <directory>src/main/webapp/WEB-INF</directory>
@@ -286,5 +303,17 @@
       </build>
     </profile>
   </profiles>
+     <repositories>
+        <repository>
+            <id>repo.maven</id>
+            <url>http://repo.maven.apache.org/maven2/</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>repo.maven</id>
+            <url>http://repo.maven.apache.org/maven2/</url>
+        </pluginRepository>
+   </pluginRepositories>
 
 </project>

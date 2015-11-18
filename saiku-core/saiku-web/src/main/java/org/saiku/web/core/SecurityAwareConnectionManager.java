@@ -181,13 +181,13 @@ public class SecurityAwareConnectionManager extends AbstractConnectionManager im
 			for (String sprRole : springRoles) {
 				//TODO 研究如何获得connection roles
 				//if (conRoles.contains(sprRole)) {
-					if (roleName == null) {
+				if (roleName == null) {
 						roleName = sprRole;
 					} else {
 						roleName += "," + sprRole;
 					}
 				//}
-			}
+		}
 
 			if (setRole(con, roleName, datasource)) {
 				return con;
@@ -242,7 +242,6 @@ public class SecurityAwareConnectionManager extends AbstractConnectionManager im
 
 
 	private List<String> getSpringRoles() {
-		//System.out.println(this.sessionService.getSession().getAttribute("SPRING_SECURITY_CONTEXT"));
 		List<String> roles = new ArrayList<String>();
 		if (SecurityContextHolder.getContext() != null && SecurityContextHolder.getContext().getAuthentication() != null) {
 			Collection<? extends GrantedAuthority>

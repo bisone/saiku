@@ -413,9 +413,9 @@ WHERE([PRODUCT].[PRODUCT CATEGORIES].BIKES)
 
 * MONDRIAN 介绍
    - [[HTTP://BLOG.CSDN.NET/LONGSHENLMJ/ARTICLE/DETAILS/18733341][ MONDRIAN SCHEMA WORKBENCH工作界面]]
-   - HTTP://BLOG.CSDN.NET/LONGSHENLMJ/ARTICLE/CATEGORY/1850253
-   - 退化维：HTTP://MONDRIAN.PENTAHO.COM/DOCUMENTATION/SCHEMA.PHP#DEGENERATE_DIMENSIONS
-   - 聚合表：HTTP://MONDRIAN.PENTAHO.COM/DOCUMENTATION/AGGREGATE_TABLES.PHP
+   - http://blog.csdn.net/longshenlmj/article/category/1850253
+   - 退化维：http://mondrian.pentaho.com/documentation/schema.php#degenerate_dimensions
+   - 聚合表：http://mondrian.pentaho.com/documentation/aggregate_tables.php
    - 使用手册 http://wiki.meteorite.bi/display/SAIK/Using+Saiku
 
 

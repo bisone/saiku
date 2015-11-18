@@ -20,9 +20,8 @@
         <module>saiku-server</module>
        <!-- <module>saiku-bi-platform-plugin-p5</module> -->
 <!--        <module>saiku-web-tests</module>-->
-    <module>ui-webapp</module>
+    <module>obobd-web</module>
   </modules>
-
     <distributionManagement>
         <repository>
             <id>utility</id>
@@ -46,7 +45,7 @@
         <tomcat.version>apache-tomcat-7.0.62</tomcat.version>
         <tomcat.source>target/stage/tomcat/</tomcat.source>
         <maven.build.timestamp.format>yyyyMMdd-HHmm</maven.build.timestamp.format>
-        <calcite.version>0.9.2-incubating</calcite.version>
+       <calcite.version>0.9.2-incubating-SNAPSHOT</calcite.version>
         <pentaho.libs.version>TRUNK-SNAPSHOT</pentaho.libs.version>
         <pentaho.platform.version>5.0.0</pentaho.platform.version>
         <serenity.version>1.0.58</serenity.version>
@@ -115,12 +114,7 @@
                 <enabled>true</enabled>
             </snapshots>
         </repository>
-
-        <repository>
-            <id>jboss</id>
-            <url>http://repository.jboss.org</url>
-        </repository>
-    </repositories>
+   </repositories>
     <build>
         <plugins>
             <plugin>
@@ -142,10 +136,7 @@
                     <skipStaging>true</skipStaging>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>license-maven-plugin</artifactId>
-            </plugin>
+
             <plugin>
                 <groupId>org.apache.rat</groupId>
                 <artifactId>apache-rat-plugin</artifactId>
@@ -230,7 +221,7 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>build-helper-maven-plugin</artifactId>
                     <version>1.9.1</version>
-                </plugin>
+               </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-checkstyle-plugin</artifactId>
@@ -252,18 +243,10 @@
             </modules>
         </profile>
     </profiles>
-    <dependencies>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>3.8.1</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
+
     <dependencyManagement>
         <dependencies>
-
-            <dependency>
+           <dependency>
                 <groupId>com.sun.jersey.jersey-test-framework</groupId>
                 <artifactId>jersey-test-framework-core</artifactId>
                 <version>${jersey.version}</version>
@@ -285,7 +268,11 @@
                 <artifactId>postgresql</artifactId>
                 <version>9.3-1102-jdbc41</version>
             </dependency>
-            
+           <!-- <dependency> -->
+           <!--      <groupId>org.apache.hive</groupId> -->
+           <!--      <artifactId>hive-jdbc</artifactId> -->
+           <!--      <version>0.13.1</version> -->
+           <!--  </dependency> -->
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
@@ -310,6 +297,12 @@
                 <groupId>org.jasig.cas.client</groupId>
                 <artifactId>cas-client-integration-tomcat-v7</artifactId>
                 <version>3.3.2</version>
+            </dependency>
+
+            <dependency>
+              <groupId>org.eclipse.jetty</groupId>
+              <artifactId>jetty-maven-plugin</artifactId>
+              <version>9.3.4.RC0</version>
             </dependency>
             <dependency>
                 <groupId>org.mozilla</groupId>
@@ -348,9 +341,9 @@
                 <type>war</type>
             </dependency>
             <dependency>
-              <groupId>org.slf4j</groupId>
-              <artifactId>slf4j-log4j12</artifactId>
-              <version>${slf4j.version}</version>
+               <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-log4j12</artifactId>
+                <version>${slf4j.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.qmino</groupId>
@@ -934,8 +927,8 @@
             <dependency>
                 <groupId>org.apache.pdfbox</groupId>
                 <artifactId>pdfbox-app</artifactId>
-                <version>2.0.0-SNAPSHOT</version>
-            </dependency>
+                <version>2.0.0.1-SNAPSHOT</version>
+           </dependency>
             <dependency>
                 <groupId>pentaho</groupId>
                 <artifactId>cda</artifactId>
@@ -977,7 +970,7 @@
                 <version>20020423</version>
             </dependency>
             <dependency>
-                <groupId>javax.servlet.jsp</groupId>
+               <groupId>javax.servlet.jsp</groupId>
                 <artifactId>jsp-api</artifactId>
                 <version>2.1</version>
             </dependency>
@@ -991,17 +984,6 @@
                 <artifactId>httpcore</artifactId>
                 <version>4.3-alpha1</version>
             </dependency>
-            <dependency>
-                <groupId>org.apache.hive</groupId>
-                <artifactId>hive-jdbc</artifactId>
-                <version>1.0.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.hive</groupId>
-                <artifactId>hive-cli</artifactId>
-                <version>1.0.0</version>
-            </dependency>
-
             <dependency>
                 <groupId>org.apache.calcite</groupId>
                 <artifactId>calcite-core</artifactId>

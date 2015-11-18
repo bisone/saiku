@@ -28,7 +28,7 @@ var Settings = {
     DIMENSION_SHOW_ALL: true,
     DIMENSION_SHOW_REDUCED: false,
     ERROR_LOGGING: true,
-    I18N_LOCALE: "en",
+    I18N_LOCALE: "cn",
     // number of erroneous ajax calls in a row before UI cant recover
     ERROR_TOLERANCE: 3,
     QUERY_PROPERTIES: {
@@ -124,7 +124,7 @@ if (Settings.BIPLUGIN5) {
     Settings.BIPLUGIN = true;
 }
 
-Settings.INITIAL_QUERY = false;
+Settings.INITIAL_QUERY = true;
 if (document.location.hash) {
     var hash = document.location.hash;
     if (hash.length > 11 && hash.substring(1, 11) == "query/open") {
@@ -135,7 +135,8 @@ if (document.location.hash) {
 Settings.MONDRIAN_LOCALES = {
     "English": "en_US",
     "Dutch": "nl_BE",
-    "French": "fr_FR"
+    "French": "fr_FR",
+    "Chinese": "zh_CN"
 };
 
 /**

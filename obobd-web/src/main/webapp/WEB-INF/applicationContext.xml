@@ -12,6 +12,6 @@
     <import resource="saiku-beans.xml"/>
     <import resource="spring-servlet.xml"/>
 
-    <import resource="applicationContext-bisone.xml"/>
+    <import resource="applicationContext-obobd.xml"/>
 
 </beans>

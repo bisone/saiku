@@ -12,152 +12,20 @@
  */
 
 var def = function() {
-    function def(qname, value, space) {
-        if (qname && !(qname instanceof def.QualifiedName)) {
-            var t = typeof qname;
-            if ("object" === t) {
-                for (var p in qname) def_1(p, qname[p], value);
-                return def;
-            }
-            if ("array" === t) {
-                for (var p in qname) def_1(qname[p], value);
-                return def;
-            }
-        }
-        def_1(qname, value, space);
-        return value;
+    function globalSpace(name, space) {
+        return globalNamespaces[name] = space;
     }
-    function def_1(qname, value, space) {
-        qname = def.qualName(qname);
-        space = def.space(qname.namespace, space);
-        if (qname.name) {
-            space[qname.name] = value;
-            value instanceof Object && def.qualNameOf(value, qname);
-        }
-    }
-    function def_syncLog(level) {
-        def.log = def.logger("[DEF]");
-        def_onDebugChanged && def_onDebugChanged.forEach(function(f) {
-            f(level);
-        });
-    }
-    function def_debugLevel() {
-        return def.debug;
-    }
-    function def_loggerReal(prompt, target) {
-        prompt = def_evalPrompt(prompt, target);
-        var logger = def_createLogFn("log", prompt);
-        logger.log = logger;
-        logger.level = def_debugLevel;
-        def_logNames.forEach(function(name) {
-            logger[name] = def_createLogFn(def_logNamesMap[name] || name, prompt);
-        });
-        return logger;
-    }
-    function def_evalPrompt(prompt, x) {
-        return prompt && (def.fun.is(prompt) ? prompt.call(x) : prompt);
-    }
-    function def_loggerAutoEnableOnce(target, loggerProp, prompt) {
-        var baseLogger = function(name) {
-            if (def.debug > 1) {
-                var logger = target[loggerProp || "log"] = def_loggerReal(prompt, target);
-                logger[name || "log"].apply(logger, A_slice.call(arguments, 1));
-            } else "error" === name && def_logError.apply(null, def.array.append([ def_evalPrompt(prompt, target) ], arguments, 1));
-        }, logger = baseLogger.bind("log");
-        logger.log = logger;
-        logger.level = def_debugLevel;
-        def_logNames.forEach(function(name) {
-            logger[name] = baseLogger.bind(name);
-        });
-        return logger;
-    }
-    function def_loggerDisabled() {
-        function logger() {}
-        logger.log = logger;
-        logger.level = def_debugLevel;
-        def_logNames.forEach(function(name) {
-            logger[name] = logger;
-        });
-        return logger;
-    }
-    function def_logError(prompt, e, s) {
-        e && "object" == typeof e && e.message && (e = e.message);
-        e = (prompt ? prompt + ": " : "") + def.nullyTo(e, "") + (s ? " " + s : "");
-        throw new Error(e);
-    }
-    function def_createLogFn(name, prompt) {
-        var fun, c = console, m = c[name] || c.log;
-        if (m) {
-            var mask = prompt ? prompt + ": %s" : "%s";
-            if (def.fun.is(m)) fun = m.bind(c, mask); else {
-                var apply = Function.prototype.apply;
-                fun = function() {
-                    apply.call(m, c, def.array.append([ mask ], arguments));
-                };
-            }
-        }
-        return fun;
-    }
-    function def_priv_key() {
-        function newSafe(value) {
-            function safe() {
-                _channel = value;
-            }
-            safe.toString = def_priv_safeToString;
-            return safe;
-        }
-        function key(safe) {
-            if (void 0 !== _channel) throw new Error("Access denied.");
-            var secret = (safe(), _channel);
-            return _channel = void 0, secret;
-        }
-        var _channel;
-        key.safe = newSafe;
-        key.property = def_priv_propCreate;
-        return key;
-    }
-    function def_priv_safeToString() {
-        return "SAFE";
-    }
-    function def_priv_propCreate(p, prefix) {
-        function instInit(inst, secret) {
-            def.setNonEnum(inst, p, key.safe(secret));
-            return secret;
-        }
-        function propKey(inst) {
-            return key(inst[p]);
-        }
-        p || (p = def_priv_random(prefix));
-        var key = this;
-        propKey.init = instInit;
-        propKey.propertyName = p;
-        return propKey;
-    }
-    function def_QualifiedName(full) {
-        var parts;
-        if (full) if (full instanceof Array) {
-            parts = full;
-            full = parts.join(".");
-        } else parts = full.split(".");
-        if (parts && parts.length > 1) {
-            this.name = parts.pop();
-            this.namespace = parts.join(".");
-        } else {
-            this.name = full || null;
-            this.namespace = null;
-        }
-    }
-    function def_getNamespace(name, base) {
-        var current = base || def_currentSpace;
+    function getNamespace(name, base) {
+        var current = base || currentNamespace;
         if (name) {
             var parts = name.split("."), L = parts.length;
             if (L) {
                 var part, i = 0;
                 if (current === def.global) {
                     part = parts[0];
-                    var globalSpace = def.getOwn(def_globalSpaces, part);
-                    if (globalSpace) {
-                        current = globalSpace;
+                    var globalNamespace = def.getOwn(globalNamespaces, part);
+                    if (globalNamespace) {
+                        current = globalNamespace;
                         i++;
                     }
                 }
@@ -169,15 +37,38 @@ var def = function() {
         }
         return current;
     }
+    function createSpace(name, base, definition) {
+        if (def.fun.is(base)) {
+            definition = base;
+            base = null;
+        }
+        var namespace = getNamespace(name, base);
+        if (definition) {
+            namespaceStack.push(currentNamespace);
+            try {
+                definition(namespace);
+            } finally {
+                currentNamespace = namespaceStack.pop();
+            }
+        }
+        return namespace;
+    }
+    function defineName(namespace, name, value) {
+        !def.hasOwn(namespace, name) || def.fail.operationInvalid("Name '{0}' is already defined in namespace.", [ name ]);
+        return namespace[name] = value;
+    }
     function createMixin(protectNativeObject) {
         return function(instance) {
-            return mixinMany(instance, A_slice.call(arguments, 1), protectNativeObject);
+            return mixinMany(instance, arraySlice.call(arguments, 1), protectNativeObject);
         };
     }
     function mixinMany(instance, mixins, protectNativeObject) {
-        for (var mixin, i = 0, L = mixins.length; L > i; ) if (mixin = mixins[i++]) {
-            mixin = def.object.as(mixin.prototype || mixin);
-            mixin && mixinRecursive(instance, mixin, protectNativeObject);
+        for (var i = 0, L = mixins.length; L > i; i++) {
+            var mixin = mixins[i];
+            if (mixin) {
+                mixin = def.object.as(mixin.prototype || mixin);
+                mixin && mixinRecursive(instance, mixin, protectNativeObject);
+            }
         }
         return instance;
     }
@@ -190,7 +81,7 @@ var def = function() {
             if (oTo) {
                 oMixin = def.object.as(vMixin);
                 if (oMixin) {
-                    O_hasOwn.call(instance, p) || (instance[p] = oTo = Object.create(oTo));
+                    objectHasOwn.call(instance, p) || (instance[p] = oTo = Object.create(oTo));
                     mixinRecursive(oTo, oMixin, protectNativeObject);
                 } else instance[p] = vMixin;
             } else {
@@ -201,244 +92,10 @@ var def = function() {
         }
     }
     function createRecursive(instance) {
-        var p, vObj;
-        for (p in instance) (vObj = def.object.asNative(instance[p])) && createRecursive(instance[p] = Object.create(vObj));
-    }
-    function def_config(pub, config) {
-        if (config) {
-            var cfg = pub.configure;
-            def.fun.is(cfg) ? cfg.call(pub, config) : def_config.generic(pub, config);
+        for (var p in instance) {
+            var vObj = def.object.asNative(instance[p]);
+            vObj && createRecursive(instance[p] = Object.create(vObj));
         }
-        return pub;
-    }
-    function def_config_expand(configs, one) {
-        function processConfig(config) {
-            var root = {};
-            roots.push(root);
-            for (var name in config) if (name) {
-                var v = config[name];
-                if (void 0 === v) continue;
-                var L, i, n, next, curr = root, di = name.indexOf("."), names = null;
-                if (di >= 0) {
-                    if (one) {
-                        names = [ name.substr(0, di) ];
-                        name = name.substr(di + 1);
-                    } else {
-                        names = name.split(".");
-                        name = names.pop();
-                    }
-                    L = names.length;
-                    i = -1;
-                    for (;++i < L; ) if (n = names[i]) {
-                        next = curr[n];
-                        if (void 0 === next) curr[n] = next = {}; else if (null === next || !def.object.is(next) || next.constructor !== Object) {
-                            roots.push(root = next = {});
-                            i = -1;
-                        }
-                        curr = next;
-                    }
-                }
-                var v0 = curr[name];
-                if (v0 !== v) {
-                    if (void 0 !== v0) {
-                        if (!def_config_isMergeableObject(v) || !def_config_isMergeableObject(v0)) continue;
-                        roots.push(root = curr = {});
-                        if (names) {
-                            i = -1;
-                            for (;++i < L; ) (n = names[i]) && (curr = curr[n] = {});
-                        }
-                    }
-                    curr[name] = v;
-                }
-            }
-        }
-        if (!configs) return [];
-        var roots = [];
-        def.array.is(configs) ? configs.forEach(processConfig) : processConfig(configs);
-        return roots;
-    }
-    function def_config_isMergeableObject(v) {
-        return v && def.object.is(v) && !def_config_isCustomObject(v);
-    }
-    function def_config_isCustomObject(v) {
-        return v.constructor !== Object && !(v instanceof Array);
-    }
-    function def_inherits(Ctor, BaseCtor) {
-        if (BaseCtor) {
-            var baseProto = BaseCtor.prototype, proto = Ctor.prototype = Object.create(baseProto);
-            def.setNonEnum(proto, "constructor", Ctor);
-            "__proto__" in proto || def.setNonEnum(proto, "__proto__", baseProto);
-        }
-        return Ctor;
-    }
-    function def_overrides(method, base, proto) {
-        function overridenClass() {
-            var _ = proto.base;
-            def.setNonEnum(proto, "base", base);
-            try {
-                return method.apply(this, arguments);
-            } finally {
-                proto.base = _;
-            }
-        }
-        function overridenInstance() {
-            var proto = def_safeProtoBase(this), _ = proto.base;
-            proto.base = base;
-            try {
-                return method.apply(this, arguments);
-            } finally {
-                proto.base = _;
-            }
-        }
-        if (!method) return base;
-        if (!base || base === method || !def_callsBase(method)) return method;
-        def_validateProtoBase(proto);
-        return def.fun.wraps(proto ? overridenClass : overridenInstance, method);
-    }
-    function def_callsBase(f) {
-        return _reCallsBase.test(f);
-    }
-    function def_validateProtoBase(proto) {
-        if (proto === O_proto) throw def.error.invalidArgument("proto", "Cannot change Object.prototype.");
-        return proto;
-    }
-    function def_safeProtoBase(inst) {
-        def_validateProtoBase(def.protoOf(inst));
-    }
-    function def_inheritedMethod(proto, p) {
-        var m = def.fun.as(proto[p]);
-        return m === O_proto[p] ? null : m;
-    }
-    function def_methods(proto, mixins, ka) {
-        proto = F_protoOrSelf(proto);
-        var baseProto = def.protoOf(proto), rootProto = def.rootProtoOf(proto), enumerable = def.get(ka, "enumerable", !0);
-        def.array.each(mixins, function(mixin) {
-            (mixin = F_protoOrSelf(mixin)) && (O_getOwnPropDesc ? def.ownKeys(mixin).forEach(function(p) {
-                def_methodPropDesc_(proto, p, O_getOwnPropDesc(mixin, p), baseProto, rootProto, enumerable);
-            }) : def.eachOwn(mixin, function(v, p) {
-                def_method_(proto, p, v, baseProto, rootProto, enumerable);
-            }));
-        });
-        return def;
-    }
-    function def_method(proto, p, v, ka) {
-        proto = F_protoOrSelf(proto);
-        var enumerable = def.get(ka, "enumerable", !0);
-        return def_method_(proto, p, v, def.protoOf(proto), def.rootProtoOf(proto), enumerable);
-    }
-    function def_isValidMethodName(p) {
-        return "base" !== p && "constructor" !== p;
-    }
-    function def_method_(proto, p, v, baseProto, rootProto, enumerable) {
-        void 0 !== v && baseProto[p] !== v && def_isValidMethodName(p) && def_methodValue(proto, p, v, rootProto, enumerable);
-        return def;
-    }
-    function def_methodValue(proto, p, v, rootProto, enumerable) {
-        var m;
-        if (v && (m = def.fun.as(v))) {
-            v = def.overrides(m, def_inheritedMethod(proto, p), rootProto);
-            enumerable ? proto[p] = v : def.setNonEnum(proto, p, v);
-        } else mixinProp(proto, p, v, def.identity);
-    }
-    function def_methodPropDesc_(proto, p, propDesc, baseProto, rootProto, enumerable) {
-        var v;
-        if (def_isValidMethodName(p)) if (propDesc.get || propDesc.set) {
-            var basePropDesc = def_inheritedPropDesc(baseProto, p);
-            if (basePropDesc) {
-                (propDesc.get || basePropDesc.get) && (propDesc.get = def.overrides(propDesc.get, basePropDesc.get, rootProto));
-                (propDesc.set || basePropDesc.set) && (propDesc.set = def.overrides(propDesc.set, basePropDesc.set, rootProto));
-            }
-            enumerable || (propDesc.enumerable = !1);
-            O_defProp(proto, p, propDesc);
-        } else void 0 !== (v = propDesc.value) && def_methodValue(proto, p, v, rootProto, enumerable);
-        return def;
-    }
-    function def_inheritedPropDesc(proto, p) {
-        var propDesc;
-        if (p in proto) for (;proto = def.protoOf(proto); ) if (propDesc = O_getOwnPropDesc(proto, p)) return propDesc;
-    }
-    function def_MetaType(TypeCtor, baseType) {
-        this.baseType = baseType || null;
-        var MetaType = this.constructor;
-        if (MetaType.Ctor) throw def.error.operationInvalid("MetaType already has an associated type constructor.");
-        if (TypeCtor && TypeCtor.Meta) throw def.error.argumentInvalid("TypeCtor", "Specified type constructor already has an associated MetaType.");
-        this.external = !!TypeCtor;
-        this.rootType = baseType ? baseType.rootType : this;
-        this._init = baseType ? baseType._init : null;
-        this._post = baseType ? baseType._post : null;
-        this.steps = void 0;
-        TypeCtor = this._initConstructor(TypeCtor || this._createConstructor());
-        this.Ctor = MetaType.Ctor = TypeCtor;
-    }
-    function def_MetaTypeStatic_methods(mixins, ka) {
-        def.methods(this, mixins, ka);
-        var TypeCtor = this.Ctor;
-        TypeCtor && def_MetaTypeStatic_syncCtor.call(this, TypeCtor, mixins);
-        return this;
-    }
-    function def_MetaTypeStatic_syncCtor(TypeCtor, mixins) {
-        var TypeProto = this.prototype;
-        def.array.each(mixins, function(mixin) {
-            def.each(F_protoOrSelf(mixin), function(v, p) {
-                if (!def.isPropPrivate(p)) {
-                    v = TypeProto[p];
-                    def.fun.is(v) ? def_MetaTypeStatic_exportMethod(TypeCtor, p, v) : TypeCtor[p] = v;
-                }
-            });
-        });
-    }
-    function def_MetaTypeStatic_exportMethod(to, p, m) {
-        function exportedTypeMethod() {
-            var metaType = this.meta, result = m.apply(metaType, arguments);
-            return result === metaType ? this : result;
-        }
-        to[p] = def.fun.wraps(exportedTypeMethod, m);
-    }
-    function def_makeSetter(name, spec) {
-        function setter(fields, v2) {
-            if (void 0 !== v2) {
-                var v1 = fields[name];
-                if (null === v2) {
-                    if (fields.___proto && O_hasOwn.call(fields, name)) {
-                        delete fields[name];
-                        v2 = fields[name];
-                        change && v2 !== v1 && change(v2, v1, this, name);
-                    }
-                } else if (v2 !== v1) {
-                    if (fail && (msg = fail(v2))) throw new def.error.argumentInvalid(name, def.string.is(msg) ? msg : "");
-                    cast && (v2 = convert.call(this, fields, v2, v1));
-                    if (null != v2) {
-                        fields[name] = v2;
-                        change && change(v2, v1, this, name);
-                    }
-                }
-            }
-            return this;
-        }
-        function convert(fields, v2, v1) {
-            var vSet = cast(v2, this);
-            if (null == vSet) {
-                if (!configurable) return;
-                if (O_hasOwn.call(fields, name)) {
-                    def.configure(v1, v2);
-                    return;
-                }
-                if (!factory) return;
-                vSet = factory(v2, v1);
-            }
-            return vSet;
-        }
-        def.fun.is(spec) && (spec = {
-            factory: spec
-        });
-        var msg, factory = def.get(spec, "factory"), configurable = def.get(spec, "configurable", !!factory), change = def.get(spec, "change"), cast = def.get(spec, "cast"), fail = def.get(spec, "fail");
-        spec = null;
-        return setter;
-    }
-    function FieldsMetaType(Ctor, baseType, keyArgs) {
-        def.MetaType.apply(this, arguments);
-        var baseType = this.baseType;
-        baseType && (this.fieldsPrivProp = baseType.constructor === FieldsMetaType ? def.get(keyArgs, "fieldsPrivProp") || fields_privProp : baseType.fieldsPrivProp);
     }
     function query_nextMany() {
         for (;this._source.next(); ) {
@@ -449,29 +106,12 @@ var def = function() {
             }
         }
     }
-    function mult10(value, exponent) {
-        if (!exponent) return value;
-        value = value.toString().split("e");
-        return +(value[0] + "e" + (value[1] ? +value[1] + exponent : exponent));
-    }
-    var IS_DONTENUM_BUGGY = function() {
-        for (var p in {
-            toString: 1
-        }) if ("toString" === p) return !1;
-        return !0;
-    }(), O_proto = Object.prototype, O_hasOwn = O_proto.hasOwnProperty, O_needEnumProps = IS_DONTENUM_BUGGY ? [ "toString", "valueOf" ] : null;
+    var arraySlice = Array.prototype.slice;
     Object.keys || (Object.keys = function(o) {
         if (o !== Object(o)) throw new TypeError("Object.keys called on non-object");
         var ret = [];
-        for (var p in o) O_hasOwn.call(o, p) && ret.push(p);
-        O_needEnumProps && O_needEnumProps.forEach(function(p) {
-            O_hasOwn.call(o, p) && ret.push(p);
-        });
+        for (var p in o) Object.prototype.hasOwnProperty.call(o, p) && ret.push(p);
         return ret;
-    });
-    Array.prototype.some || (Array.prototype.some = function(fun) {
-        for (var t = Object(this), len = t.length >>> 0, thisArg = arguments.length >= 2 ? arguments[1] : void 0, i = 0; len > i; i++) if (i in t && fun.call(thisArg, t[i], i, t)) return !0;
-        return !1;
     });
     Object.create || (Object.create = function() {
         function create(baseProto) {
@@ -483,42 +123,18 @@ var def = function() {
         var Klass = function() {}, proto = Klass.prototype;
         return create;
     }());
-    Function.prototype.bind || (Function.prototype.bind = function(A_slice) {
-        return function(ctx) {
-            var staticArgs = A_slice.call(arguments, 1), fToBind = this;
-            return function() {
-                return fToBind.apply(ctx, staticArgs.concat(A_slice.call(arguments)));
-            };
+    Function.prototype.bind || (Function.prototype.bind = function(ctx) {
+        var staticArgs = arraySlice.call(arguments, 1), fToBind = this;
+        return function() {
+            return fToBind.apply(ctx, staticArgs.concat(arraySlice.call(arguments)));
         };
-    }(Array.prototype.slice));
+    });
     this.JSON || (this.JSON = {});
     this.JSON.stringify || (this.JSON.stringify = function(t) {
-        return String(t);
+        return "" + t;
     });
-    var A_slice = Array.prototype.slice, A_empty = [], O_defProp = function() {
-        var defProp = Object.defineProperty;
-        if (defProp) try {
-            defProp({}, "test", {});
-        } catch (ex) {
-            return null;
-        }
-        return defProp;
-    }(), O_getOwnPropDesc = function() {
-        var ownPropDesc = O_defProp && Object.getOwnPropertyDescriptor;
-        return ownPropDesc && null === ownPropDesc({
-            value: null
-        }, "value").value ? ownPropDesc : void 0;
-    }(), F_protoOrSelf = function(F) {
-        return F.prototype || F;
-    };
-    def.global = this;
-    def.copyOwn = function(a, b) {
-        var to, from;
-        arguments.length >= 2 ? (to = a || {}, from = b) : (to = {}, from = a);
-        for (var p in from) O_hasOwn.call(from, p) && (to[p] = from[p]);
-        return to;
-    };
-    def.copyOwn(def, {
+    var objectHasOwn = Object.prototype.hasOwnProperty, def = {
+        global: this,
         get: function(o, p, dv) {
             var v;
             return o && null != (v = o[p]) ? v : dv;
@@ -562,28 +178,19 @@ var def = function() {
         },
         getOwn: function(o, p, dv) {
             var v;
-            return o && O_hasOwn.call(o, p) && null != (v = o[p]) ? v : dv;
+            return o && objectHasOwn.call(o, p) && null != (v = o[p]) ? v : dv;
         },
         hasOwn: function(o, p) {
-            return !!o && O_hasOwn.call(o, p);
+            return !!o && objectHasOwn.call(o, p);
         },
-        protoOf: Object.getPrototypeOf || function(o) {
-            return o.__proto__ || o.constructor && o.constructor.prototype;
-        },
-        rootProtoOf: function(inst) {
-            for (var proto = null, proto2 = def.protoOf(inst); proto2 && proto2 !== O_proto && proto2 !== proto; ) proto2 = def.protoOf(proto = proto2);
-            return proto;
-        },
-        hasOwnProp: O_hasOwn,
+        hasOwnProp: objectHasOwn,
         set: function(o) {
             for (var oo = o || {}, a = arguments, i = 1, A = a.length - 1; A > i; i += 2) oo[a[i]] = a[i + 1];
             return oo;
         },
         setDefaults: function(o, o2) {
             var p, oo = o || {}, a = arguments, A = a.length;
-            if (2 === A && def.object.is(o2)) def.each(o2, function(v, p) {
-                null == oo[p] && (oo[p] = v);
-            }); else {
+            if (2 === A && def.object.is(o2)) for (p in o2) null == oo[p] && (oo[p] = o2[p]); else {
                 A--;
                 for (var i = 1; A > i; i += 2) {
                     p = a[i];
@@ -594,9 +201,7 @@ var def = function() {
         },
         setUDefaults: function(o, o2) {
             var p, oo = o || {}, a = arguments, A = a.length;
-            if (2 === A && def.object.is(o2)) def.each(o2, function(v, p) {
-                void 0 === oo[p] && (oo[p] = v);
-            }); else {
+            if (2 === A && def.object.is(o2)) for (p in o2) void 0 === oo[p] && (oo[p] = o2[p]); else {
                 A--;
                 for (var i = 1; A > i; i += 2) {
                     p = a[i];
@@ -605,53 +210,23 @@ var def = function() {
             }
             return oo;
         },
-        setNonEnum: function() {
-            if (!O_defProp) return function(o, p, v) {
-                o[p] = v;
-                return o;
-            };
-            var nonEnumDesc = {
-                enumerable: !1,
-                configurable: !0,
-                writable: !0,
-                value: void 0
-            };
-            return function(o, p, v) {
-                nonEnumDesc.value = v;
-                O_defProp(o, p, nonEnumDesc);
-                nonEnumDesc.value = null;
-                return o;
-            };
-        }(),
-        setConst: function() {
-            if (!O_defProp) return function(o, p, v) {
-                o[p] = v;
-                return o;
-            };
-            var constDesc = {
-                enumerable: !1,
-                configurable: !1,
-                writable: !1,
-                value: void 0
-            };
-            return function(o, p, v) {
-                constDesc.value = v;
-                O_defProp(o, p, constDesc);
-                constDesc.value = null;
-                return o;
-            };
-        }(),
         eachOwn: function(o, fun, ctx) {
-            for (var p in o) O_hasOwn.call(o, p) && fun.call(ctx, o[p], p, o);
-            o && O_needEnumProps && O_needEnumProps.forEach(function(p) {
-                O_hasOwn.call(o, p) && fun.call(ctx, o[p], p, o);
-            });
+            if (o) for (var p in o) objectHasOwn.call(o, p) && fun.call(ctx, o[p], p, o);
         },
         each: function(o, fun, ctx) {
-            for (var p in o) fun.call(ctx, o[p], p, o);
-            o && O_needEnumProps && O_needEnumProps.forEach(function(p) {
-                O_hasOwn.call(o, p) && fun.call(ctx, o[p], p, o);
-            });
+            if (o) for (var p in o) fun.call(ctx, o[p], p, o);
+        },
+        copyOwn: function(a, b) {
+            var to, from;
+            if (arguments.length >= 2) {
+                to = a || {};
+                from = b;
+            } else {
+                to = {};
+                from = a;
+            }
+            if (from) for (var p in from) objectHasOwn.call(from, p) && (to[p] = from[p]);
+            return to;
         },
         copy: function(a, b) {
             var to, from;
@@ -662,21 +237,19 @@ var def = function() {
                 to = {};
                 from = a;
             }
-            def.each(from, function(v, p) {
-                to[p] = v;
-            });
-            return to;
-        },
-        copyx: function(to, from, keyArgs) {
-            var where = def.get(keyArgs, "where"), set = def.get(keyArgs, "set");
-            def.each(from, function(v, p) {
-                (!where || where(from, p, to)) && (set ? set(to, p, v) : to[p] = v);
-            });
+            if (from) for (var p in from) to[p] = from[p];
             return to;
         },
         copyProps: function(a, b, props) {
             var to, from;
-            arguments.length >= 3 ? (to = a || {}, from = b) : (to = {}, from = a, props = b);
+            if (arguments.length >= 3) {
+                to = a || {};
+                from = b;
+            } else {
+                to = {};
+                from = a;
+                props = b;
+            }
             props && props.forEach(from ? function(p) {
                 to[p] = from[p];
             } : function(p) {
@@ -687,24 +260,19 @@ var def = function() {
         keys: function(o) {
             var keys = [];
             for (var p in o) keys.push(p);
-            o && O_needEnumProps && O_needEnumProps.forEach(function(p) {
-                keys.push(p);
-            });
             return keys;
         },
         values: function(o) {
             var values = [];
-            def.each(o, function(v) {
-                values.push(v);
-            });
+            for (var p in o) values.push(o[p]);
             return values;
         },
         uniqueIndex: function(o, key, ctx) {
             var index = {};
-            def.each(o, function(v, p) {
-                key && (v = key.call(ctx, v));
-                null == v || O_hasOwn.call(index, v) || (index[v] = p);
-            });
+            for (var p in o) {
+                var v = key ? key.call(ctx, o[p]) : o[p];
+                null == v || objectHasOwn.call(index, v) || (index[v] = p);
+            }
             return index;
         },
         ownKeys: Object.keys,
@@ -716,53 +284,14 @@ var def = function() {
                 return o[key];
             });
         },
-        make: function(Ctor, args) {
-            var inst = Object.create(Ctor.prototype);
-            return Ctor.apply(inst, args || A_empty) || inst;
+        scope: function(scopeFun, ctx) {
+            return scopeFun.call(ctx);
         },
-        isPropPrivate: function(p) {
-            return !!p && "_" === p.charAt(0);
-        }
-    });
-    def.object = {
-        is: function(v) {
-            return !!v && "object" == typeof v;
-        },
-        isNative: function(v) {
-            return !!v && v.constructor === Object;
-        },
-        as: function(v) {
-            return v && "object" == typeof v ? v : null;
-        },
-        asNative: function(v) {
-            return v && v.constructor === Object ? v : null;
-        },
-        lazy: function(scope, p, f, ctx) {
-            return scope[p] || (scope[p] = f ? f.call(ctx, p) : {});
-        }
-    };
-    def.lazy = def.object.lazy;
-    def.info = function(o, info) {
-        var i;
-        if (o && info) {
-            i = o.__info__;
-            if (arguments.length < 2) return i;
-            i || def.setNonEnum(o, "__info__", i = {});
-            def.copyOwn(i, info);
-        }
-        return o;
-    };
-    def.info.get = function(o, p, dv) {
-        return def.get(o && o.__info__, p, dv);
-    };
-    def.copyOwn(def, {
         bit: {
             set: function(bits, set, on) {
                 return on || null == on ? bits | set : bits & ~set;
             }
-        }
-    });
-    def.copyOwn(def, {
+        },
         compare: function(a, b) {
             return a === b ? 0 : a > b ? 1 : -1;
         },
@@ -797,6 +326,92 @@ var def = function() {
         retFalse: function() {
             return !1;
         },
+        number: {
+            is: function(v) {
+                return "number" == typeof v;
+            },
+            as: function(d, dv) {
+                var v = parseFloat(d);
+                return isNaN(v) ? dv || 0 : v;
+            },
+            to: function(d, dv) {
+                var v = parseFloat(d);
+                return isNaN(v) ? dv || 0 : v;
+            }
+        },
+        array: {
+            is: function(v) {
+                return v instanceof Array;
+            },
+            isLike: function(v) {
+                return v && null != v.length && "string" != typeof v;
+            },
+            as: function(thing) {
+                return thing instanceof Array ? thing : null != thing ? [ thing ] : null;
+            },
+            to: function(thing) {
+                return thing instanceof Array ? thing : null != thing ? [ thing ] : null;
+            },
+            lazy: function(scope, p, f, ctx) {
+                return scope[p] || (scope[p] = f ? f.call(ctx, p) : []);
+            },
+            copy: function(al) {
+                return arraySlice.apply(al, arraySlice.call(arguments, 1));
+            }
+        },
+        object: {
+            is: function(v) {
+                return v && "object" == typeof v;
+            },
+            isNative: function(v) {
+                return !!v && v.constructor === Object;
+            },
+            as: function(v) {
+                return v && "object" == typeof v ? v : null;
+            },
+            asNative: function(v) {
+                return v && v.constructor === Object ? v : null;
+            },
+            lazy: function(scope, p, f, ctx) {
+                return scope[p] || (scope[p] = f ? f.call(ctx, p) : {});
+            }
+        },
+        string: {
+            is: function(v) {
+                return "string" == typeof v;
+            },
+            to: function(v, ds) {
+                return null != v ? "" + v : ds || "";
+            },
+            join: function(sep) {
+                var v, v2, a = arguments, L = a.length;
+                switch (L) {
+                  case 3:
+                    v = a[1];
+                    v2 = a[2];
+                    return null != v && "" !== v ? null != v2 && "" !== v2 ? "" + v + sep + ("" + v2) : "" + v : null != v2 && "" !== v2 ? "" + v2 : "";
+
+                  case 2:
+                    v = a[1];
+                    return null != v ? "" + v : "";
+
+                  case 1:
+                  case 0:
+                    return "";
+                }
+                for (var args = [], i = 1; L > i; i++) {
+                    v = a[i];
+                    null != v && "" !== v && args.push("" + v);
+                }
+                return args.join(sep);
+            },
+            padRight: function(s, n, p) {
+                s || (s = "");
+                null == p && (p = " ");
+                var k = ~~((n - s.length) / p.length);
+                return k > 0 ? s + new Array(k + 1).join(p) : s;
+            }
+        },
         fun: {
             is: function(v) {
                 return "function" == typeof v;
@@ -811,63 +426,407 @@ var def = function() {
                 return function() {
                     return v;
                 };
-            },
-            wraps: function(by, wrapped) {
-                by.valueOf = def.fun.constant(wrapped);
-                return by;
             }
-        }
-    });
-    def.ascending = def.compare;
-    def.descending = def.compareReverse;
-    def.number = {
-        is: function(v) {
-            return "number" == typeof v;
         },
-        as: function(d, dv) {
-            var v = parseFloat(d);
-            return isNaN(v) ? dv || 0 : v;
+        nullyTo: function(v, dv) {
+            return null != v ? v : dv;
         },
-        to: function(d, dv) {
-            var v = parseFloat(d);
-            return isNaN(v) ? dv || 0 : v;
+        between: function(v, min, max) {
+            return Math.max(min, Math.min(v, max));
+        },
+        nully: function(v) {
+            return null == v;
+        },
+        notNully: function(v) {
+            return null != v;
+        },
+        notUndef: function(v) {
+            return void 0 !== v;
+        },
+        empty: function(v) {
+            return null == v || "" === v;
+        },
+        notEmpty: function(v) {
+            return null != v && "" !== v;
+        },
+        truthy: function(x) {
+            return !!x;
+        },
+        falsy: function(x) {
+            return !x;
+        },
+        firstUpperCase: function(s) {
+            if (s) {
+                var c = s.charAt(0), cU = c.toUpperCase();
+                c !== cU && (s = cU + s.substr(1));
+            }
+            return s;
+        },
+        firstLowerCase: function(s) {
+            if (s) {
+                var c = s.charAt(0), cL = c.toLowerCase();
+                c !== cL && (s = cL + s.substr(1));
+            }
+            return s;
+        },
+        format: function(mask, scope, ctx) {
+            if (null == mask || "" === mask) return "";
+            var isScopeFun = scope && def.fun.is(scope);
+            return mask.replace(/(^|[^{])\{([^{}]+)\}/g, function($0, before, prop) {
+                var value = scope ? isScopeFun ? scope.call(ctx, prop) : scope[prop] : null;
+                return before + (null == value ? "" : String(value));
+            });
+        },
+        destructuringTypeBind: function(types, values) {
+            var T = types.length, result = new Array(T);
+            if (T && values) {
+                var V = values.length;
+                if (V) {
+                    var v = 0, t = 0;
+                    do {
+                        var value = values[v];
+                        if (null == value || typeof value === types[t]) {
+                            result[t] = value;
+                            v++;
+                        }
+                        t++;
+                    } while (T > t && V > v);
+                }
+            }
+            return result;
+        },
+        error: function(error) {
+            return error instanceof Error ? error : new Error(error);
+        },
+        fail: function(error) {
+            throw def.error(error);
+        },
+        assert: function(msg, scope) {
+            throw def.error.assertionFailed(msg, scope);
         }
     };
-    def.array = {
-        empty: function(v) {
-            return !(v && v.length);
-        },
+    def.ascending = def.compare;
+    def.descending = def.compareReverse;
+    var AL = def.array.like = def.copyOwn(function(v) {
+        return AL.is(v) ? v : [ v ];
+    }, {
         is: function(v) {
-            return v instanceof Array;
-        },
-        isLike: function(v) {
             return v && null != v.length && "string" != typeof v;
         },
-        as: function(thing) {
-            return thing instanceof Array ? thing : null != thing ? [ thing ] : null;
-        },
-        to: function(thing) {
-            return thing instanceof Array ? thing : null != thing ? [ thing ] : null;
-        },
-        lazy: function(scope, p, f, ctx) {
-            return scope[p] || (scope[p] = f ? f.call(ctx, p) : []);
-        },
-        copy: function(al) {
-            return A_slice.apply(al, A_slice.call(arguments, 1));
-        },
-        each: function(a, f, x) {
-            void 0 !== a && (def.array.is(a) ? a.forEach(f, x) : f.call(x, a, 0));
-        },
-        like: def.copyOwn(function(v) {
-            return AL.is(v) ? v : [ v ];
-        }, {
-            is: function(v) {
-                return !!v && null != v.length && "string" != typeof v;
-            },
-            as: function(v) {
-                return AL.is(v) ? v : null;
+        as: function(v) {
+            return AL.is(v) ? v : null;
+        }
+    });
+    AL.to = AL;
+    def.lazy = def.object.lazy;
+    def.shared = function() {
+        function create(value) {
+            function safe() {
+                _channel = value;
             }
-        }),
+            return safe;
+        }
+        function opener(safe) {
+            if (null != _channel) throw new Error("Access denied.");
+            safe();
+            var value;
+            value = _channel;
+            _channel = null;
+            return value;
+        }
+        var _channel = null;
+        opener.safe = create;
+        return opener;
+    };
+    var errors = {
+        operationInvalid: function(msg, scope) {
+            return def.error(def.string.join(" ", "Invalid operation.", def.format(msg, scope)));
+        },
+        notImplemented: function() {
+            return def.error("Not implemented.");
+        },
+        argumentRequired: function(name) {
+            return def.error(def.format("Required argument '{0}'.", [ name ]));
+        },
+        argumentInvalid: function(name, msg, scope) {
+            return def.error(def.string.join(" ", def.format("Invalid argument '{0}'.", [ name ]), def.format(msg, scope)));
+        },
+        assertionFailed: function(msg, scope) {
+            return def.error(def.string.join(" ", "Assertion failed.", def.format(msg, scope)));
+        }
+    };
+    def.copyOwn(def.error, errors);
+    def.eachOwn(errors, function(errorFun, name) {
+        def.fail[name] = function() {
+            throw errorFun.apply(null, arguments);
+        };
+    });
+    var currentNamespace = def, globalNamespaces = {}, namespaceStack = [];
+    def.space = createSpace;
+    def.globalSpace = globalSpace;
+    def.mixin = createMixin(Object.create);
+    def.copyOwn(def.mixin, {
+        custom: createMixin,
+        inherit: def.mixin,
+        copy: createMixin(def.copy),
+        share: createMixin(def.identity)
+    });
+    def.create = function() {
+        var mixins = arraySlice.call(arguments), deep = !0, baseProto = mixins.shift();
+        if ("boolean" == typeof baseProto) {
+            deep = baseProto;
+            baseProto = mixins.shift();
+        }
+        var instance = baseProto ? Object.create(baseProto) : {};
+        deep && createRecursive(instance);
+        if (mixins.length > 0) {
+            mixins.unshift(instance);
+            def.mixin.apply(def, mixins);
+        }
+        return instance;
+    };
+    def.scope(function() {
+        function typeLocked() {
+            return def.error.operationInvalid("Type is locked.");
+        }
+        function getStatic(state, p) {
+            if (state) do {
+                var v = def.getOwn(state.constructor, p);
+                if (void 0 !== v) return v;
+            } while (state = state.base);
+        }
+        function TypeName(full) {
+            var parts;
+            if (full) if (full instanceof Array) {
+                parts = full;
+                full = parts.join(".");
+            } else parts = full.split(".");
+            if (parts && parts.length > 1) {
+                this.name = parts.pop();
+                this.namespace = parts.join(".");
+                this.namespaceParts = parts;
+            } else {
+                this.name = full || null;
+                this.namespace = null;
+                this.namespaceParts = [];
+            }
+        }
+        function Method(spec) {
+            this.fun = spec.as;
+            this.isAbstract = !!spec.isAbstract;
+        }
+        function asMethod(fun) {
+            if (fun) {
+                if (def.fun.is(fun)) return new Method({
+                    as: fun
+                });
+                if (fun instanceof Method) return fun;
+                if (def.fun.is(fun.as)) return new Method(fun);
+                if (fun.isAbstract) return new Method({
+                    isAbstract: !0,
+                    as: def.fail.notImplemented
+                });
+            }
+            return null;
+        }
+        function method(fun) {
+            return asMethod(fun) || def.fail.argumentInvalid("fun");
+        }
+        function rootType() {}
+        function override(method, base) {
+            return function() {
+                var prevBase = rootProto.base;
+                rootProto.base = base;
+                try {
+                    return method.apply(this, arguments);
+                } finally {
+                    rootProto.base = prevBase;
+                }
+            };
+        }
+        function overrideMethod(mname, method) {
+            this[mname] = override(method, this[mname]);
+            return this;
+        }
+        function toStringMethod() {
+            return "" + this.constructor;
+        }
+        function inherits(type, base) {
+            var proto = type.prototype = Object.create(base.prototype);
+            proto.constructor = type;
+            return proto;
+        }
+        function createConstructor(state) {
+            function constructor() {
+                if (S) for (var i = 0; steps[i].apply(this, arguments) !== !1 && ++i < S; ) ;
+            }
+            var S = 1, steps = [ function() {
+                S = 0;
+                if (state.initOrPost) {
+                    steps.length = 0;
+                    if (state.init) {
+                        steps.push(state.init);
+                        S++;
+                    }
+                    if (state.post) {
+                        steps.push(state.post);
+                        S++;
+                    }
+                    constructor.apply(this, arguments);
+                    return !1;
+                }
+                steps = null;
+            } ];
+            return constructor;
+        }
+        function type() {
+            var args = def.destructuringTypeBind(_typeFunArgTypes, arguments);
+            return typeCore.apply(this, args);
+        }
+        function typeCore(name, baseType, space) {
+            var baseState, typeName = new TypeName(name);
+            if (baseType) {
+                baseState = baseType.safe && shared(baseType.safe) || def.fail.operationInvalid('Invalid "foreign" base type.');
+                baseState.locked = !0;
+            } else {
+                baseType = rootType;
+                baseState = rootState;
+            }
+            var state = Object.create(baseState);
+            state.locked = !1;
+            state.base = baseState;
+            state.methods = Object.create(baseState.methods);
+            var constructor = createConstructor(state);
+            def.copyOwn(constructor, typeProto);
+            constructor.name = typeName.name;
+            constructor.typeName = typeName;
+            constructor.safe = shared.safe(state);
+            constructor.toString = function() {
+                return "" + this.typeName || "Anonymous type";
+            };
+            var proto = inherits(constructor, baseType);
+            state.constructor = constructor;
+            proto.override = overrideMethod;
+            proto.toString = toStringMethod;
+            typeName.name && defineName(def.space(typeName.namespace, space), typeName.name, constructor);
+            return constructor;
+        }
+        var shared = def.shared(), typeProto = {
+            init: function(init) {
+                init || def.fail.argumentRequired("init");
+                var state = shared(this.safe);
+                !state.locked || def.fail(typeLocked());
+                var baseInit = state.init;
+                baseInit && (init = override(init, baseInit));
+                state.init = init;
+                state.initOrPost = !0;
+                return this;
+            },
+            postInit: function(postInit) {
+                postInit || def.fail.argumentRequired("postInit");
+                var state = shared(this.safe);
+                !state.locked || def.fail(typeLocked());
+                var basePostInit = state.post;
+                basePostInit && (postInit = override(postInit, basePostInit));
+                state.post = postInit;
+                state.initOrPost = !0;
+                return this;
+            },
+            add: function(mixin) {
+                var state = shared(this.safe);
+                !state.locked || def.fail(typeLocked());
+                var proto = this.prototype, baseState = state.base;
+                def.each(mixin.prototype || mixin, function(value, p) {
+                    switch (p) {
+                      case "base":
+                      case "constructor":
+                        return;
+
+                      case "toString":
+                        if (value === toStringMethod) return;
+                        break;
+
+                      case "override":
+                        if (value === overrideMethod) return;
+                    }
+                    if (value) {
+                        var method = asMethod(value);
+                        if (method) {
+                            var baseMethod, bm = state.methods[p];
+                            if (bm && bm instanceof Method) baseMethod = bm; else if (baseState) {
+                                bm = baseState.methods[p];
+                                bm && bm instanceof Method && (baseMethod = bm);
+                            }
+                            state.methods[p] = method;
+                            baseMethod && (value = baseMethod.override(method));
+                            proto[p] = value;
+                            return;
+                        }
+                    }
+                    mixinProp(proto, p, value, def.identity);
+                });
+                return this;
+            },
+            getStatic: function(p) {
+                return getStatic(shared(this.safe), p);
+            },
+            addStatic: function(mixin) {
+                var state = shared(this.safe);
+                !state.locked || def.fail(typeLocked());
+                for (var p in mixin) if ("prototype" !== p) {
+                    var v2 = mixin[p], o2 = def.object.as(v2);
+                    if (o2) {
+                        var v1 = def.getOwn(this, p), v1Local = void 0 !== v1;
+                        v1Local || (v1 = getStatic(state.base, p));
+                        var o1 = def.object.asNative(v1);
+                        if (o1) {
+                            if (v1Local) {
+                                def.mixin(v1, v2);
+                                continue;
+                            }
+                            v2 = def.create(v1, v2);
+                        }
+                    }
+                    this[p] = v2;
+                }
+                return this;
+            }
+        };
+        TypeName.prototype.toString = function() {
+            return def.string.join(".", this.namespace + "." + this.name);
+        };
+        def.copyOwn(Method.prototype, {
+            override: function(method) {
+                if (this.isAbstract) return method.fun;
+                var fun2 = override(method.fun, this.fun);
+                method.fun = fun2;
+                return fun2;
+            }
+        });
+        var rootProto = rootType.prototype;
+        rootProto.base = void 0;
+        var rootState = {
+            locked: !0,
+            init: void 0,
+            postInit: void 0,
+            initOrPost: !1,
+            methods: {},
+            constructor: rootType
+        };
+        rootType.safe = shared.safe(rootState);
+        var _typeFunArgTypes = [ "string", "function", "object" ];
+        def.type = type;
+        def.method = method;
+    });
+    def.makeEnum = function(a) {
+        var i = 1, e = {};
+        a.forEach(function(p) {
+            e[p] = i;
+            i <<= 1;
+        });
+        return e;
+    };
+    def.copyOwn(def.array, {
         create: function(len, dv) {
             var a = len >= 0 ? new Array(len) : [];
             if (void 0 !== dv) for (var i = 0; len > i; i++) a[i] = dv;
@@ -879,8 +838,11 @@ var def = function() {
             return target;
         },
         appendMany: function(target) {
-            var source, a = arguments, S = a.length;
-            if (S > 1) for (var s = 1; S > s; s++) if (source = def.array.to(a[s])) for (var i = 0, L = source.length; L > i; ) target.push(source[i++]);
+            var a = arguments, S = a.length;
+            if (S > 1) for (var t = target.length, s = 1; S > s; s++) {
+                var source = a[s];
+                if (source) for (var i = 0, L = source.length; L > i; ) target[t++] = source[i++];
+            }
             return target;
         },
         prepend: function(target, source, start) {
@@ -922,654 +884,8 @@ var def = function() {
             var index = def.array.binarySearch(array, item, comparer);
             return index >= 0 ? array.splice(index, 1)[0] : void 0;
         }
-    };
-    var AL = def.array.like;
-    AL.to = AL;
-    def.string = {
-        is: function(v) {
-            return "string" == typeof v;
-        },
-        to: function(v, ds) {
-            return null != v ? String(v) : ds || "";
-        },
-        join: function(sep) {
-            var v, v2, a = arguments, L = a.length;
-            switch (L) {
-              case 3:
-                v = a[1];
-                v2 = a[2];
-                return null != v && "" !== v ? null != v2 && "" !== v2 ? "" + v + sep + ("" + v2) : "" + v : null != v2 && "" !== v2 ? "" + v2 : "";
-
-              case 2:
-                v = a[1];
-                return null != v ? "" + v : "";
-
-              case 1:
-              case 0:
-                return "";
-            }
-            for (var args = [], i = 1; L > i; i++) {
-                v = a[i];
-                null != v && "" !== v && args.push("" + v);
-            }
-            return args.join(sep);
-        },
-        padRight: function(s, n, p) {
-            s || (s = "");
-            null == p && (p = " ");
-            var k = ~~((n - s.length) / p.length);
-            return k > 0 ? s + new Array(k + 1).join(p) : s;
-        }
-    };
-    def.copyOwn(def, {
-        firstUpperCase: function(s) {
-            if (s) {
-                var c = s.charAt(0), cU = c.toUpperCase();
-                c !== cU && (s = cU + s.substr(1));
-            }
-            return s;
-        },
-        firstLowerCase: function(s) {
-            if (s) {
-                var c = s.charAt(0), cL = c.toLowerCase();
-                c !== cL && (s = cL + s.substr(1));
-            }
-            return s;
-        },
-        titleFromName: function(name) {
-            return def.firstUpperCase(name).replace(/([a-z\d])([A-Z])/, "$1 $2");
-        },
-        format: function(mask, scope, ctx) {
-            if (null == mask || "" === mask) return "";
-            var isScopeFun = scope && def.fun.is(scope);
-            return mask.replace(/(^|[^{])\{([^{}]+)\}/g, function($0, before, prop) {
-                var value = scope ? isScopeFun ? scope.call(ctx, prop) : scope[prop] : null;
-                return before + (null == value ? "" : String(value));
-            });
-        }
     });
-    def.copyOwn(def, {
-        nullyTo: function(v, dv) {
-            return null != v ? v : dv;
-        }
-    });
-    def.copyOwn(def, {
-        between: function(v, min, max) {
-            return Math.max(min, Math.min(v, max));
-        },
-        nully: function(v) {
-            return null == v;
-        },
-        notNully: function(v) {
-            return null != v;
-        },
-        notUndef: function(v) {
-            return void 0 !== v;
-        },
-        empty: function(v) {
-            return null == v || "" === v;
-        },
-        notEmpty: function(v) {
-            return null != v && "" !== v;
-        },
-        truthy: function(x) {
-            return !!x;
-        },
-        falsy: function(x) {
-            return !x;
-        }
-    });
-    def.copyOwn(def, {
-        error: function(error) {
-            return error instanceof Error ? error : new Error(error);
-        },
-        fail: function(error) {
-            throw def.error(error);
-        },
-        assert: function(msg, scope) {
-            throw def.error.assertionFailed(msg, scope);
-        }
-    });
-    def.eachOwn({
-        operationInvalid: function(msg, scope) {
-            return def.error(def.string.join(" ", "Invalid operation.", def.format(msg, scope)));
-        },
-        notImplemented: function() {
-            return def.error("Not implemented.");
-        },
-        argumentRequired: function(name) {
-            return def.error(def.format("Required argument '{0}'.", [ name ]));
-        },
-        argumentInvalid: function(name, msg, scope) {
-            return def.error(def.string.join(" ", def.format("Invalid argument '{0}'.", [ name ]), def.format(msg, scope)));
-        },
-        assertionFailed: function(msg, scope) {
-            return def.error(def.string.join(" ", "Assertion failed.", def.format(msg, scope)));
-        }
-    }, function(errorFun, name) {
-        def.error[name] = errorFun;
-        def.fail[name] = function() {
-            throw errorFun.apply(null, arguments);
-        };
-    });
-    def.debug = 0;
-    !function() {
-        if ("undefined" != typeof window && window.location) {
-            var urlIfHasDebug = function(url) {
-                return url && /\bdebug=true\b/.test(url) ? url : null;
-            }, url = urlIfHasDebug(window.location.href);
-            if (!url) try {
-                url = urlIfHasDebug(window.top.location.href);
-            } catch (e) {}
-            if (url) {
-                var m = /\bdebugLevel=(\d+)/.exec(url);
-                def.debug = m ? +m[1] : 3;
-            }
-        }
-    }();
-    def.logSeparator = "------------------------------------------";
-    def.setDebug = function(level) {
-        level = +level;
-        level = isNaN(level) ? 0 : level;
-        level > 1 && "undefined" == typeof console && (level = 1);
-        if (!def.log || def.debug != level) {
-            def.debug = level;
-            def_syncLog(level);
-        }
-        return def.debug;
-    };
-    var def_onDebugChanged = null;
-    def.addOnDebugChanged = function(f) {
-        def_onDebugChanged || (def_onDebugChanged = []).push(f);
-    };
-    var def_disabledLogger, def_logNames = [ "info", "debug", "error", "warn", "group", "groupEnd" ], def_logNamesMap = {
-        group: "groupCollapsed"
-    };
-    def.logger = function(prompt, target, loggerProp) {
-        return def.debug > 1 ? def_loggerReal(prompt, target) : target ? def_loggerAutoEnableOnce(target, loggerProp, prompt) : def_disabledLogger || (def_disabledLogger = def_loggerDisabled());
-    };
-    def.setDebug(def.debug);
-    def.priv = {
-        key: def_priv_key
-    };
-    var def_priv_random = function(prefix) {
-        return "_" + def.nullyTo(prefix, "safe") + new Date().getTime() + Math.round(1e3 * Math.random());
-    }, the_priv_key = def.priv.key();
-    def.copyOwn(def, {
-        scope: function(scopeFun, ctx) {
-            return scopeFun.call(ctx);
-        },
-        firstDefined: function(funs, args, x) {
-            var v, i = 0, L = funs.length;
-            args || (args = []);
-            for (;L > i; ) if (void 0 !== (v = funs[i++].apply(x, args))) return v;
-        },
-        indexedId: function(prefix, index) {
-            return index > 0 ? prefix + "" + (index + 1) : prefix;
-        },
-        splitIndexedId: function(indexedId) {
-            var match = /^(.*?)(\d*)$/.exec(indexedId), index = null;
-            if (match[2]) {
-                index = Number(match[2]);
-                1 >= index ? index = 1 : index--;
-            }
-            return [ match[1], index ];
-        },
-        parseDistinctIndexArray: function(value, min, max) {
-            value = def.array.as(value);
-            if (null == value) return null;
-            null == min && (min = 0);
-            null == max && (max = 1/0);
-            var a = def.query(value).select(function(index) {
-                return +index;
-            }).where(function(index) {
-                return !isNaN(index) && index >= min && max >= index;
-            }).distinct().array();
-            return a.length ? a : null;
-        },
-        argumentsTypeBind: function(types, values) {
-            var V, T = types.length, result = new Array(T);
-            if (T && values && (V = values.length)) {
-                var v = 0, t = 0;
-                do {
-                    var value = values[v];
-                    if (null == value || typeof value === types[t]) {
-                        result[t] = value;
-                        v++;
-                    }
-                    t++;
-                } while (T > t && V > v);
-            }
-            return result;
-        },
-        argumentsTypeBound: function(types, fun) {
-            return function() {
-                var args = def.argumentsTypeBind(types, arguments);
-                return fun.apply(this, args);
-            };
-        }
-    });
-    def.qualName = function(full) {
-        return full instanceof def_QualifiedName ? full : new def_QualifiedName(full);
-    };
-    def.QualifiedName = def_QualifiedName;
-    def_QualifiedName.prototype.toString = function() {
-        return def.string.join(".", this.namespace, this.name);
-    };
-    def.qualNameOf = function(o, n) {
-        if (arguments.length > 1) {
-            o.__qname__ = def.qualName(n);
-            return o;
-        }
-        return o.__qname__;
-    };
-    var def_currentSpace = def, def_globalSpaces = {}, def_spaceStack = [];
-    def.globalSpace = function(name, space) {
-        return def_globalSpaces[name] = space;
-    };
-    def.space = function(name, base, definition) {
-        if (def.fun.is(base)) {
-            definition = base;
-            base = null;
-        }
-        def.string.is(base) && (base = def_getNamespace(base));
-        var space = def_getNamespace(name, base);
-        if (definition) {
-            def_spaceStack.push(def_currentSpace);
-            try {
-                definition(space);
-            } finally {
-                def_currentSpace = def_spaceStack.pop();
-            }
-        }
-        return space;
-    };
-    def.describe = function(t, keyArgs) {
-        var maxLevel = def.get(keyArgs, "maxLevel") || 5, out = [];
-        def.describeRecursive(out, t, maxLevel, keyArgs);
-        return out.join("");
-    };
-    def.describeRecursive = function(out, t, remLevels, keyArgs) {
-        if (remLevels > 0) {
-            remLevels--;
-            switch (typeof t) {
-              case "undefined":
-                return out.push("undefined");
-
-              case "object":
-                if (!t) {
-                    out.push("null");
-                    return !0;
-                }
-                if (def.fun.is(t.describe)) return t.describe(out, remLevels, keyArgs);
-                if (t instanceof Array) {
-                    out.push("[");
-                    t.forEach(function(item, index) {
-                        index && out.push(", ");
-                        def.describeRecursive(out, item, remLevels, keyArgs) || out.pop();
-                    });
-                    out.push("]");
-                } else {
-                    var ownOnly = def.get(keyArgs, "ownOnly", !0);
-                    if (t === def.global) return out.push("<window>"), !0;
-                    if (def.fun.is(t.cloneNode)) return out.push("<dom #" + (t.id || t.name || "?") + ">"), 
-                    !0;
-                    if (remLevels > 1 && t.constructor !== Object) {
-                        remLevels = 1;
-                        ownOnly = !0;
-                    }
-                    out.push("{");
-                    var first = !0;
-                    for (var p in t) if (!ownOnly || def.hasOwnProp.call(t, p)) {
-                        first || out.push(", ");
-                        out.push(p + ": ");
-                        if (def.describeRecursive(out, t[p], remLevels, keyArgs)) first && (first = !1); else {
-                            out.pop();
-                            first || out.pop();
-                        }
-                    }
-                    if (first) {
-                        var s = "" + t;
-                        "[object Object]" !== s && out.push("{" + s + "}");
-                    }
-                    out.push("}");
-                }
-                return !0;
-
-              case "number":
-                out.push("" + Math.round(1e5 * t) / 1e5);
-                return !0;
-
-              case "boolean":
-                out.push("" + t);
-                return !0;
-
-              case "string":
-                out.push(JSON.stringify(t));
-                return !0;
-
-              case "function":
-                return def.get(keyArgs, "funs", !1) ? (out.push(JSON.stringify(t.toString().substr(0, 13) + "...")), 
-                !0) : !1;
-            }
-            out.push("'new ???'");
-            return !0;
-        }
-    };
-    def.mixin = createMixin(Object.create);
-    def.copyOwn(def.mixin, {
-        custom: createMixin,
-        inherit: def.mixin,
-        copy: createMixin(def.copy),
-        share: createMixin(def.identity)
-    });
-    def.create = function() {
-        var mixins = A_slice.call(arguments), deep = !0, baseProto = mixins.shift();
-        if ("boolean" == typeof baseProto) {
-            deep = baseProto;
-            baseProto = mixins.shift();
-        }
-        var instance;
-        if (baseProto) {
-            instance = Object.create(baseProto);
-            deep && createRecursive(instance);
-        } else instance = {};
-        if (mixins.length > 0) {
-            mixins.unshift(instance);
-            def.mixin.apply(def, mixins);
-        }
-        return instance;
-    };
-    def.attached = function(o, n, v) {
-        var at = o.__attached__;
-        if (arguments.length > 2) {
-            if (void 0 !== v) {
-                at || def.setNonEnum(o, "__attached__", at = {});
-                at[n] = v;
-            }
-            return o;
-        }
-        return at && at[n];
-    };
-    def.attached.is = function(n) {
-        return !(!n || n.indexOf("$") < 0);
-    };
-    var def_configBlackList = {
-        tryConfigure: 1,
-        configure: 1,
-        $type: 1
-    };
-    def.configure = def.config = def_config;
-    def.configurable = function(yes, v) {
-        return def.info(v, {
-            configurable: !!yes
-        });
-    };
-    def.copyOwn(def_config, {
-        generic: function(pub, configs) {
-            configs && def.array.each(configs, function(config) {
-                var m;
-                config.constructor === Object ? def_config.setters(pub, config) : pub !== config && (m = pub.tryConfigure) && def.fun.is(m) && m.call(pub, config);
-            });
-            return pub;
-        },
-        isPropConfigurable: function(n) {
-            return !!n && "_" !== n.charAt(0) && !O_hasOwn.call(def_configBlackList, n);
-        },
-        setters: function(pub, config) {
-            config && def_config.expand1(config).forEach(function(configx) {
-                def.each(configx, function(v, name) {
-                    def_config.setter(pub, name, v);
-                });
-            });
-            return pub;
-        },
-        setter: function(pub, name, value) {
-            var m, m0, l, v0;
-            if (void 0 !== value && def_config.isPropConfigurable(name) && def.fun.is(m = pub[name]) && (m0 = m.valueOf()) && def.info.get(m0, "configurable", (l = m0.length) >= 1)) if (def.attached.is(name)) def.attached(pub, name, value); else if (l) m.call(pub, value); else {
-                v0 = m.call(pub);
-                (def.object.is(v0) || def.fun.is(v0)) && def_config(v0, value);
-            }
-            return pub;
-        },
-        expand1: function(configs) {
-            return def_config_expand(configs, !0);
-        },
-        expand: def_config_expand
-    });
-    def.fun.inherits = def_inherits;
-    def.overrides = def_overrides;
-    def.fun.callsBase = def_callsBase;
-    var _reCallsBase = /\.\s*base\b/;
-    def.methods = def_methods;
-    def.method = def_method;
-    def.abstractMethod = def.fail.notImplemented;
-    def("MetaType", def_MetaType);
-    var metaTypeExcludeStaticCopy = {
-        Ctor: 1,
-        BaseType: 1,
-        prototype: 1
-    };
-    def.copyOwn(def_MetaType, {
-        methods: def_MetaTypeStatic_methods,
-        add: def.configurable(!1, function() {
-            return def_MetaTypeStatic_methods.apply(this, arguments);
-        }),
-        inst: def.configurable(!1, function() {
-            return this.Ctor;
-        }),
-        subType: def.configurable(!1, function(MetaType, metaTypeConfig, metaTypeKeyArgs) {
-            var BaseMetaType = this, BaseTypeCtor = BaseMetaType.Ctor, baseMetaType = BaseTypeCtor && BaseTypeCtor.meta || def.fail.operationInvalid("MetaType is not yet instantiated.");
-            def.fun.inherits(MetaType, BaseMetaType);
-            def.copyx(MetaType, BaseMetaType, {
-                where: function(o, p) {
-                    return O_hasOwn.call(o, p) && "_" !== p.charAt(0) && !O_hasOwn.call(metaTypeExcludeStaticCopy, p);
-                }
-            });
-            MetaType.BaseType = BaseMetaType;
-            new MetaType(null, baseMetaType, metaTypeKeyArgs);
-            metaTypeConfig && def.configure(MetaType, metaTypeConfig);
-            return MetaType;
-        }),
-        extend: def.configurable(!1, function(typeConfig, typeKeyArgs) {
-            function MetaType() {
-                return BaseMetaType.apply(this, arguments);
-            }
-            var BaseMetaType = this;
-            def.fun.wraps(MetaType, BaseMetaType);
-            return BaseMetaType.subType(MetaType, typeConfig, typeKeyArgs);
-        })
-    });
-    def_MetaType.add({
-        closed: function() {
-            return !!this.steps;
-        },
-        close: function() {
-            this.steps || this._closeCore(this.steps = []);
-            return this;
-        },
-        _assertOpened: function() {
-            if (this.closed()) throw def.error.operationInvalid("MetaType is closed.");
-        },
-        _closeCore: function(steps) {
-            this._addPostSteps(steps);
-            this._addInitSteps(steps);
-        },
-        _createConstructor: function() {
-            function Class() {
-                for (var i = S; i--; ) steps[i].apply(this, arguments) === !0 && (i = S);
-            }
-            var S = 1, type = this, steps = [ function() {
-                steps = type.close().steps;
-                S = steps.length;
-                return !0;
-            } ];
-            return Class;
-        },
-        _initConstructor: function(TypeCtor) {
-            var MetaType = this.constructor;
-            def_MetaTypeStatic_syncCtor.call(MetaType, TypeCtor, MetaType);
-            TypeCtor.meta = this;
-            this.baseType && def.fun.inherits(TypeCtor, this.baseType.close().Ctor);
-            TypeCtor.Meta = MetaType;
-            return TypeCtor;
-        },
-        _addPostSteps: function(steps) {
-            this._post && steps.push(this._post);
-        },
-        _addInitSteps: function(steps) {
-            this._init && steps.push(this._init);
-        },
-        init: function(init) {
-            if (!init) throw def.error.argumentRequired("init");
-            this._assertOpened();
-            this._init = def.overrides(init, this._init, this.rootType.Ctor.prototype);
-            return this;
-        },
-        postInit: function(postInit) {
-            if (!postInit) throw def.error.argumentRequired("postInit");
-            this._assertOpened();
-            this._post = def.overrides(postInit, this._post, this.rootType.Ctor.prototype);
-            return this;
-        },
-        type: def.configurable(!0, function() {
-            return this.constructor;
-        }),
-        add: def.configurable(!1, function(mixin, ka) {
-            return def.methods(this.Ctor, mixin, ka), this;
-        }),
-        methods: function(mixins, ka) {
-            return def.methods(this.Ctor, mixins, ka), this;
-        },
-        method: def.configurable(!1, function(p, v, ka) {
-            return def.method(this.Ctor, p, v, ka), this;
-        }),
-        configure: function(config) {
-            return def.configure.generic(this, config), this;
-        },
-        extend: def.configurable(!1, function(instConfig, typeKeyArgs) {
-            var SubTypeCtor = this.constructor.extend(null, typeKeyArgs).Ctor;
-            return SubTypeCtor.configure(instConfig);
-        })
-    });
-    var def_Object = new def_MetaType().close().Ctor.add({
-        override: function(p, v) {
-            return def_method_(this, p, v, def.protoOf(this), def_Object.prototype, !0), this;
-        },
-        toString: function() {
-            return "[object " + String(def.qualNameOf(def.classOf(this))) + "]";
-        }
-    }, {
-        enumerable: !1
-    });
-    def("Object", def_Object);
-    def.type = def.argumentsTypeBound([ "string", "function", "object" ], function(name, baseCtor, space) {
-        var BaseMetaType = baseCtor ? baseCtor.Meta : def_MetaType, TypeCtor = BaseMetaType.extend().Ctor;
-        return def(name, TypeCtor, space);
-    });
-    def.makeEnum = function(a, ka) {
-        var i = 1, all = 0, e = {}, allItem = def.get(ka, "all");
-        a.forEach(function(p) {
-            e[p] = i;
-            allItem && (all |= i);
-            i <<= 1;
-        });
-        allItem && (e[allItem] = all);
-        return e;
-    };
-    def.copyOwn(def, {
-        classify: function(v, Class) {
-            def.setNonEnum(v, "_class", Class);
-            return v;
-        },
-        classOf: function(v) {
-            return v && (v._class || v.constructor) || void 0;
-        },
-        is: function(v, Class) {
-            return !!v && (v._class && v._class === Class || v instanceof Class);
-        },
-        as: function(v, Class, fv) {
-            return def.is(v, Class) ? v : fv;
-        },
-        createIs: function(Class) {
-            function isClass(v) {
-                return def.is(v, Class);
-            }
-            return isClass;
-        },
-        createAs: function(Class) {
-            function asClass(v) {
-                return def.as(v, Class);
-            }
-            return asClass;
-        }
-    });
-    var fields_privProp = the_priv_key.property();
-    def.copyOwn(def, {
-        instance: function(inst, config, proto, specs, privProp) {
-            var fields = def.fields(inst, proto, privProp);
-            specs && def.instanceAccessors(inst, fields, specs);
-            config && def.configure(inst, config);
-            return fields;
-        },
-        fields: function(inst, proto, privProp) {
-            var klass = def.classOf(inst);
-            proto && def.is(proto, klass) || (proto = klass.defaults);
-            void 0 === privProp && (privProp = fields_privProp);
-            var protoFields = proto && privProp && privProp(proto), fields = protoFields ? Object.create(protoFields) : {};
-            fields.___proto = proto;
-            privProp && privProp.init(inst, fields);
-            return fields;
-        },
-        classAccessors: function(classOrProto, specs, privProp) {
-            var classProto = F_protoOrSelf(classOrProto);
-            for (var name in specs) classProto[name] = def.classAccessor(name, specs[name], privProp);
-            return def;
-        },
-        classAccessor: function(name, spec, privProp) {
-            function classAccessor(v) {
-                var fields = privProp(this);
-                return arguments.length ? setter.call(this, fields, v) : fields[name];
-            }
-            var setter = def_makeSetter(name, spec);
-            privProp || (privProp = fields_privProp);
-            return classAccessor;
-        },
-        instanceAccessors: function(inst, fields, specs) {
-            for (var name in specs) inst[name] = def.instanceAccessor(inst, name, specs[name], fields);
-            return def;
-        },
-        instanceAccessor: function(inst, name, spec, fields) {
-            function instanceAccessor(v) {
-                return arguments.length ? setter.call(inst, fields, v) : fields[name];
-            }
-            var setter = def_makeSetter(name, spec);
-            return instanceAccessor;
-        }
-    });
-    def.MetaType.subType(FieldsMetaType, {
-        methods: {
-            fields: function(specs) {
-                var accessors = {};
-                for (var name in specs) accessors[name] = def.classAccessor(name, specs[name], this.fieldsPrivProp);
-                return this.methods(accessors);
-            },
-            _addInitSteps: function(steps) {
-                function initConfig(config) {
-                    config && def.configure(this, config);
-                }
-                function initFields(config, proto) {
-                    def.fields(this, proto, type.fieldsPrivProp);
-                }
-                steps.push(initConfig);
-                this.base(steps);
-                var type = this;
-                steps.push(initFields);
-            }
-        }
-    });
-    def("FieldsBase", FieldsMetaType.Ctor);
-    var nextGlobalId = 1, nextIdByScope = {}, P_ID = "__def_id__";
+    var nextGlobalId = 1, nextIdByScope = {};
     def.nextId = function(scope) {
         if (scope) {
             var nextId = def.getOwn(nextIdByScope, scope) || 1;
@@ -1578,217 +894,166 @@ var def = function() {
         }
         return nextGlobalId++;
     };
-    def.id = function(inst) {
-        var id = def.getOwn(inst, P_ID);
-        id || def.setConst(inst, P_ID, id = def.nextId());
-        return id;
-    };
-    def.hashKey = function(value) {
-        var t = (typeof value).charAt(0);
-        switch (t) {
-          case "n":
-          case "b":
-          case "s":
-            return t + ":" + value;
-        }
-        return t + ":" + (value ? value : def.id(value));
-    };
-    def("Set", def.Object.extend({
-        init: function(source, count) {
-            this.source = source || {};
-            this.count = source ? null != count ? count : def.ownKeys(source).length : 0;
+    def.type("Set").init(function(source, count) {
+        this.source = source || {};
+        this.count = source ? null != count ? count : def.ownKeys(source).length : 0;
+    }).add({
+        has: function(p) {
+            return objectHasOwn.call(this.source, p);
         },
-        methods: {
-            has: function(p) {
-                return O_hasOwn.call(this.source, p);
-            },
-            add: function(p) {
-                var source = this.source;
-                if (!O_hasOwn.call(source, p)) {
-                    this.count++;
-                    source[p] = !0;
-                }
-                return this;
-            },
-            rem: function(p) {
-                if (O_hasOwn.call(this.source, p)) {
-                    delete this.source[p];
-                    this.count--;
-                }
-                return this;
-            },
-            clear: function() {
-                if (this.count) {
-                    this.source = {};
-                    this.count = 0;
-                }
-                return this;
-            },
-            members: function() {
-                return def.ownKeys(this.source);
+        add: function(p) {
+            var source = this.source;
+            if (!objectHasOwn.call(source, p)) {
+                this.count++;
+                source[p] = !0;
             }
-        }
-    }));
-    def("Map", def.Object.extend({
-        init: function(source, count) {
-            this.source = source || {};
-            this.count = source ? null != count ? count : def.ownKeys(source).length : 0;
+            return this;
         },
-        methods: {
-            has: function(p) {
-                return O_hasOwn.call(this.source, p);
-            },
-            get: function(p) {
-                return O_hasOwn.call(this.source, p) ? this.source[p] : void 0;
-            },
-            set: function(p, v) {
-                var source = this.source;
-                O_hasOwn.call(source, p) || this.count++;
-                source[p] = v;
-                return this;
-            },
-            rem: function(p) {
-                if (O_hasOwn.call(this.source, p)) {
-                    delete this.source[p];
-                    this.count--;
-                }
-                return this;
-            },
-            clear: function() {
-                if (this.count) {
-                    this.source = {};
-                    this.count = 0;
-                }
-                return this;
-            },
-            copy: function(other) {
-                def.eachOwn(other.source, function(value, p) {
-                    this.set(p, value);
-                }, this);
-            },
-            values: function() {
-                return def.own(this.source);
-            },
-            keys: function() {
-                return def.ownKeys(this.source);
-            },
-            clone: function() {
-                return new def.Map(def.copy(this.source), this.count);
-            },
-            symmetricDifference: function(other) {
-                if (!this.count) return other.clone();
-                if (!other.count) return this.clone();
-                var result = {}, count = 0, as = this.source, bs = other.source;
-                def.eachOwn(as, function(a, p) {
-                    if (!O_hasOwn.call(bs, p)) {
-                        result[p] = a;
-                        count++;
-                    }
-                });
-                def.eachOwn(bs, function(b, p) {
-                    if (!O_hasOwn.call(as, p)) {
-                        result[p] = b;
-                        count++;
-                    }
-                });
-                return new def.Map(result, count);
-            },
-            intersect: function(other, result) {
-                result || (result = new def.Map());
-                def.eachOwn(this.source, function(value, p) {
-                    other.has(p) && result.set(p, value);
-                });
-                return result;
+        rem: function(p) {
+            if (objectHasOwn.call(this.source, p)) {
+                delete this.source[p];
+                this.count--;
             }
-        }
-    }));
-    def("OrderedMap", def.Object.extend({
-        init: function() {
-            this._list = [];
-            this._map = {};
+            return this;
         },
-        methods: {
-            has: function(key) {
-                return O_hasOwn.call(this._map, key);
-            },
-            count: function() {
-                return this._list.length;
-            },
-            get: function(key) {
-                var map = this._map;
-                return O_hasOwn.call(map, key) ? map[key].value : void 0;
-            },
-            at: function(index) {
-                var bucket = this._list[index];
-                return bucket ? bucket.value : void 0;
-            },
-            add: function(key, v, index) {
-                var map = this._map, bucket = O_hasOwn.call(map, key) && map[key];
-                if (bucket) bucket.value !== v && (bucket.value = v); else {
-                    bucket = map[key] = {
-                        key: key,
-                        value: v
-                    };
-                    null == index ? this._list.push(bucket) : def.array.insertAt(this._list, index, bucket);
-                }
-                return this;
-            },
-            rem: function(key) {
-                var map = this._map, bucket = O_hasOwn.call(map, key) && map[key];
-                if (bucket) {
-                    var index = this._list.indexOf(bucket);
-                    this._list.splice(index, 1);
-                    delete this._map[key];
-                }
-                return this;
-            },
-            clear: function() {
-                if (this._list.length) {
-                    this._map = {};
-                    this._list.length = 0;
-                }
-                return this;
-            },
-            keys: function() {
-                return def.ownKeys(this._map);
-            },
-            forEach: function(fun, ctx) {
-                return this._list.forEach(function(bucket) {
-                    fun.call(ctx, bucket.value, bucket.key);
-                });
+        clear: function() {
+            if (this.count) {
+                this.source = {};
+                this.count = 0;
             }
+            return this;
+        },
+        members: function() {
+            return def.ownKeys(this.source);
         }
-    }));
+    });
+    def.type("Map").init(function(source, count) {
+        this.source = source || {};
+        this.count = source ? null != count ? count : def.ownKeys(source).length : 0;
+    }).add({
+        has: function(p) {
+            return objectHasOwn.call(this.source, p);
+        },
+        get: function(p) {
+            return objectHasOwn.call(this.source, p) ? this.source[p] : void 0;
+        },
+        set: function(p, v) {
+            var source = this.source;
+            objectHasOwn.call(source, p) || this.count++;
+            source[p] = v;
+            return this;
+        },
+        rem: function(p) {
+            if (objectHasOwn.call(this.source, p)) {
+                delete this.source[p];
+                this.count--;
+            }
+            return this;
+        },
+        clear: function() {
+            if (this.count) {
+                this.source = {};
+                this.count = 0;
+            }
+            return this;
+        },
+        copy: function(other) {
+            def.eachOwn(other.source, function(value, p) {
+                this.set(p, value);
+            }, this);
+        },
+        values: function() {
+            return def.own(this.source);
+        },
+        keys: function() {
+            return def.ownKeys(this.source);
+        },
+        clone: function() {
+            return new def.Map(def.copy(this.source), this.count);
+        },
+        symmetricDifference: function(other) {
+            if (!this.count) return other.clone();
+            if (!other.count) return this.clone();
+            var result = {}, count = 0, as = this.source, bs = other.source;
+            def.eachOwn(as, function(a, p) {
+                if (!objectHasOwn.call(bs, p)) {
+                    result[p] = a;
+                    count++;
+                }
+            });
+            def.eachOwn(bs, function(b, p) {
+                if (!objectHasOwn.call(as, p)) {
+                    result[p] = b;
+                    count++;
+                }
+            });
+            return new def.Map(result, count);
+        },
+        intersect: function(other, result) {
+            result || (result = new def.Map());
+            def.eachOwn(this.source, function(value, p) {
+                other.has(p) && result.set(p, value);
+            });
+            return result;
+        }
+    });
+    def.type("OrderedMap").init(function() {
+        this._list = [];
+        this._map = {};
+    }).add({
+        has: function(key) {
+            return objectHasOwn.call(this._map, key);
+        },
+        count: function() {
+            return this._list.length;
+        },
+        get: function(key) {
+            var map = this._map;
+            return objectHasOwn.call(map, key) ? map[key].value : void 0;
+        },
+        at: function(index) {
+            var bucket = this._list[index];
+            return bucket ? bucket.value : void 0;
+        },
+        add: function(key, v, index) {
+            var map = this._map, bucket = objectHasOwn.call(map, key) && map[key];
+            if (bucket) bucket.value !== v && (bucket.value = v); else {
+                bucket = map[key] = {
+                    key: key,
+                    value: v
+                };
+                null == index ? this._list.push(bucket) : def.array.insertAt(this._list, index, bucket);
+            }
+            return this;
+        },
+        rem: function(key) {
+            var map = this._map, bucket = objectHasOwn.call(map, key) && map[key];
+            if (bucket) {
+                var index = this._list.indexOf(bucket);
+                this._list.splice(index, 1);
+                delete this._map[key];
+            }
+            return this;
+        },
+        clear: function() {
+            if (this._list.length) {
+                this._map = {};
+                this._list.length = 0;
+            }
+            return this;
+        },
+        keys: function() {
+            return def.ownKeys(this._map);
+        },
+        forEach: function(fun, ctx) {
+            return this._list.forEach(function(bucket) {
+                fun.call(ctx, bucket.value, bucket.key);
+            });
+        }
+    });
     def.html = {
         escape: function(str) {
             return def.string.to(str).replace(/&/gm, "&amp;").replace(/</gm, "&lt;").replace(/>/gm, "&gt;").replace(/"/gm, "&quot;");
-        },
-        tag: function(name, attrs) {
-            attrs = attrs ? def.ownKeys(attrs).map(function(n) {
-                var v = attrs[n];
-                return def.empty(v) ? "" : " " + n + '="' + String(v) + '"';
-            }).join("") : "";
-            var content = arguments.length > 2 ? A_slice.call(arguments, 2).map(function(cont) {
-                if (null != cont) {
-                    def.fun.is(cont) && (cont = cont());
-                    cont = def.array.is(cont) ? cont.map(def.string.to).join("") : def.string.to(cont);
-                }
-                return cont || "";
-            }).join("") : "";
-            return "<" + name + attrs + ">" + content + "</" + name + ">";
-        },
-        classes: function(prefix) {
-            prefix = prefix ? prefix + "-" : "";
-            var out = [];
-            A_slice.call(arguments, 1).forEach(function(s) {
-                def.empty(s) || out.push(prefix + def.css.escapeClass(s));
-            });
-            return out.join(" ");
-        }
-    };
-    def.css = {
-        escapeClass: function(name) {
-            return (name || "").replace(/\s/g, "_");
         }
     };
     def.type("Query").add({
@@ -1805,7 +1070,9 @@ var def = function() {
             me.index = index;
             return !0;
         },
-        _next: def.abstractMethod,
+        _next: def.method({
+            isAbstract: !0
+        }),
         _finish: function() {
             var me = this;
             if (me.index > -2) {
@@ -1818,8 +1085,8 @@ var def = function() {
             for (var me = this; me.next(); ) if (f.call(x, me.item, me.index) === !1) return !0;
             return !1;
         },
-        array: function(to) {
-            for (var array = to || [], me = this; me.next(); ) array.push(me.item);
+        array: function() {
+            for (var array = [], me = this; me.next(); ) array.push(me.item);
             return array;
         },
         sort: function(compare, by) {
@@ -1869,13 +1136,17 @@ var def = function() {
             return theItem;
         },
         any: function(pred, ctx) {
-            for (;this.next(); ) if (!pred || pred.call(ctx, this.item, this.index)) return this._finish(), 
-            !0;
+            for (;this.next(); ) if (!pred || pred.call(ctx, this.item, this.index)) {
+                this._finish();
+                return !0;
+            }
             return !1;
         },
         all: function(pred, ctx) {
-            for (;this.next(); ) if (!pred.call(ctx, this.item, this.index)) return this._finish(), 
-            !1;
+            for (;this.next(); ) if (!pred.call(ctx, this.item, this.index)) {
+                this._finish();
+                return !1;
+            }
             return !0;
         },
         min: function() {
@@ -1914,7 +1185,7 @@ var def = function() {
             var keyIndex = {};
             this.each(function(item) {
                 var key = keyFun ? keyFun.call(ctx, item) : item;
-                null == key || O_hasOwn.call(keyIndex, key) || (keyIndex[key] = item);
+                null == key || objectHasOwn.call(keyIndex, key) || (keyIndex[key] = item);
             });
             return keyIndex;
         },
@@ -1960,7 +1231,7 @@ var def = function() {
     });
     def.type("ArrayLikeQuery", def.Query).init(function(list) {
         function arraLike_next() {
-            for (;++i < I; ) if (O_hasOwn.call(list, i)) {
+            for (;++i < I; ) if (objectHasOwn.call(list, i)) {
                 me.index = i;
                 me.item = list[i];
                 return !0;
@@ -2069,7 +1340,7 @@ var def = function() {
         function distinct_next() {
             for (;s.next(); ) {
                 var e = s.item, v = k ? k.call(x, e, s.index) : e;
-                if (null != v && !O_hasOwn.call(ks, v)) {
+                if (null != v && !objectHasOwn.call(ks, v)) {
                     me.item = e;
                     me.index = ++i;
                     return ks[v] = !0;
@@ -2117,7 +1388,7 @@ var def = function() {
             }
             var count = this._count;
             if (count > nextIndex) {
-                for (var index = count - nextIndex - 1, source = this._source; !O_hasOwn.call(source, index); ) {
+                for (var index = count - nextIndex - 1, source = this._source; !objectHasOwn.call(source, index); ) {
                     if (--index < 0) return !1;
                     this._count--;
                 }
@@ -2132,58 +1403,6 @@ var def = function() {
     def.range = function(start, count, step) {
         return new def.RangeQuery(start, count, step);
     };
-    def.textTable = function(C) {
-        function table() {
-            return rows.map(function(r) {
-                switch (r) {
-                  case rowSepMarkerFirst:
-                    return renderRow(r, "╤", "═", "╔", "╗");
-
-                  case rowSepMarker:
-                    return rowSep || (rowSep = renderRow(r, "┼", "─", "╟", "╢"));
-
-                  case rowSepMarkerLast:
-                    return renderRow(r, "╧", "═", "╚", "╝");
-                }
-                return renderRow(r, "│", " ", "║", "║");
-            }).join("\n");
-        }
-        function renderRow(r, colSep, pad, first, last) {
-            return first + r.map(function(s, i) {
-                return def.string.padRight(s || "", colsMaxLen[i], pad);
-            }).join(colSep) + last;
-        }
-        var rowSep, rows = [], contPad = " ", colsMaxLen = new Array(C), rowSepMarkerFirst = def.array.create(C, ""), rowSepMarker = rowSepMarkerFirst.slice(), rowSepMarkerLast = rowSepMarkerFirst.slice();
-        table.row = function() {
-            for (var v, s, args = arguments, i = -1, r = new Array(C); ++i < C; ) {
-                v = args[i];
-                s = r[i] = contPad + (void 0 === v ? "" : String(v)) + contPad;
-                colsMaxLen[i] = Math.max(colsMaxLen[i] || 0, s.length);
-            }
-            rows.push(r);
-            return table;
-        };
-        table.rowSep = function(isLast) {
-            rows.push(rows.length ? isLast ? rowSepMarkerLast : rowSepMarker : rowSepMarkerFirst);
-            return table;
-        };
-        return table;
-    };
-    def.round10 = function(value, places) {
-        if (!places) return Math.round(value);
-        value = +value;
-        if (isNaN(value) || "number" != typeof places || places % 1 !== 0) return 0/0;
-        value = Math.round(mult10(value, places));
-        return mult10(value, -places);
-    };
-    def.mult10 = function(value, exponent) {
-        return exponent ? mult10(+value, exponent) : value;
-    };
-    def.delta = function(a, b) {
-        if (a === b) return 0;
-        var d = a - b;
-        return 0 > d ? -d : d;
-    };
-    def_currentSpace = def.global;
+    currentNamespace = def.global;
     return def;
 }();

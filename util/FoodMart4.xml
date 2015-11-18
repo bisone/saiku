@@ -238,8 +238,7 @@
     </Dimension>
 
     <Dimension name='Time' table='time_by_day' type='TIME' key='Time Id'>
-
-        <Attributes>
+       <Attributes>
             <Attribute name='Year' keyColumn='the_year' levelType='TimeYears' hasHierarchy='false'>
             </Attribute>
             <Attribute name='Quarter' levelType='TimeQuarters' hasHierarchy='false'>
@@ -291,6 +290,7 @@
             </Attribute>
             <Attribute name='Date' keyColumn='the_date' hasHierarchy='false'/>
             <Attribute name='Date String' keyColumn='the_date' hasHierarchy='false'/>
+            <Attribute name='Date String' keyColumn='date_string' hasHierarchy='false'/>
             <Attribute name='Time Id' keyColumn='time_id' hasHierarchy='false'/>
         </Attributes>
 

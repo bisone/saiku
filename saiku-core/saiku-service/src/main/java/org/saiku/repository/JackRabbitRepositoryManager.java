@@ -33,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
-
 import javax.jcr.*;
 import javax.jcr.nodetype.NodeTypeExistsException;
 import javax.jcr.nodetype.NodeTypeManager;
@@ -50,7 +49,6 @@ import java.io.*;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
 /**
  * JackRabbit JCR Repository Manager for Saiku.
  */
@@ -128,7 +126,7 @@ public class JackRabbitRepositoryManager implements IRepositoryManager {
     }
 
     //Make sure new password is set to repo default
-    //TODO Fixme mysql 不支持 UserManager
+    // mysql 不支持 UserManager
     try {
       if (password != null && !password.equals("")) {
         UserManager userManager = ((JackrabbitSession) session).getUserManager();
@@ -136,12 +134,15 @@ public class JackRabbitRepositoryManager implements IRepositoryManager {
 
         ((User) authorizable).changePassword(password);
       }
-    }catch (Exception e){
-      e.printStackTrace();
+    }catch(UnsupportedRepositoryOperationException e){
+      log.info("Error如果使用Jackrabbit 连接mysql,请忽略这个错误");
+
+    }catch (Exception ex){
+      log.error("连接Jackrabbit异常", ex);
     }
   }
 
-  public boolean start(UserService userService) throws RepositoryException {
+ public boolean start(UserService userService) throws RepositoryException {
     this.userService = userService;
     if (session == null) {
       log.info("starting repo");
@@ -159,9 +160,9 @@ public class JackRabbitRepositoryManager implements IRepositoryManager {
             log.info("配置文件【" + xml + "】是否存在？" + resource.exists());
             config = RepositoryConfig.create(resource.getURI(), dir);
         } catch (IOException e) {
-            e.printStackTrace();
+          log.error("Jackrabbit配置信息读取错误", e);
         }
-      repository = RepositoryImpl.create(config);
+     repository = RepositoryImpl.create(config);
 
       log.info("repo started");
       log.info("logging in");
@@ -170,14 +171,18 @@ public class JackRabbitRepositoryManager implements IRepositoryManager {
 
       JackrabbitSession js = (JackrabbitSession) session;
       try {
+
         if (js.getUserManager().getAuthorizable("anon") == null) {
           js.getUserManager().createUser("anon", "anon");
           js.save();
 
         }
-      }catch(Exception e){
-        e.printStackTrace();
-      }
+      }catch(UnsupportedRepositoryOperationException e){
+        log.info("Error如果使用Jackrabbit 连接mysql,请忽略这个错误");
+
+      }catch (Exception ex){
+        log.error("连接Jackrabbit异常",ex);
+     }
       session = js;
       root = session.getRootNode();
 
@@ -1088,7 +1093,7 @@ System.out.println(e.getLocalizedMessage());
             repoObjects
                 .add(new RepositoryFileObject(filename, "#" + files.getPath(), extension, files.getPath(),
                         acls));
-          }
+         }
           if (files.getPrimaryNodeType().getName().equals("nt:folder")) {
             List<AclMethod> acls = acl2.getMethods(files, username, roles);
 
@@ -1167,7 +1172,7 @@ System.out.println(e.getLocalizedMessage());
                   repoObjects
                       .add(new RepositoryFileObject(filename, "#" + relativePath, extension, relativePath,
                               acls));
-                }
+               }
                 if (file.getPrimaryNodeType().getName().equals("nt:folder")) {
                   //repoObjects.add(new RepositoryFolderObject(filename, "#" + relativePath, relativePath, acls, getRepoObjects(file, fileType, username, roles)));
                 }

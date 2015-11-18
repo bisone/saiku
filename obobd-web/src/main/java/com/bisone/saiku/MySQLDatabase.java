@@ -1,8 +1,7 @@
-package org.saiku.database;
+package com.bisone.saiku;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.jackrabbit.api.JackrabbitNodeTypeManager;
-import org.h2.jdbcx.JdbcDataSource;
 import org.saiku.datasources.datasource.SaikuDatasource;
 import org.saiku.service.datasource.IDatasourceManager;
 import org.saiku.service.importer.LegacyImporter;

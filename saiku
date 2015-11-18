@@ -15,7 +15,14 @@ jetty: 简洁方式启动
 eom
 }
 
-
+function start_ui(){
+    kill -9 `lsof -i:9988 | grep node | awk '{print $2}'`
+    kill -9 `lsof -i:35729 | grep grunt | awk '{print $2}'`
+    cd saiku-ui
+    npm run start2 &
+    grunt &
+    cd -
+}
 case $1 in
     "build")
         mvn clean install -DskipTests=true
@@ -35,21 +42,17 @@ case $1 in
         tail -f tomcat/logs/catalina.out &
         tail -f tomcat/logs/saiku.log &
         ;;
-    "jetty")
-        cd saiku-ui
-        npm run start2 &
-        cd -
+    jetty | dev)
+        start_ui
         cd saiku-core
-        mvn clean install -DskipTests=true -e -o
+        mvn  clean install -DskipTests=true -e 
         cd -
-        cd ui-webapp
-        mvn install
-        mvn  jetty:run-exploded
+        cd obobd-web
+        mvn  clean install -e
+        mvn -e jetty:run-exploded
         ;;
     "ui")
-        cd saiku-ui
-        npm run start2 &
-        grunt &
+       start_ui
         ;;
     *)
         echo "-----------------------------------------------------"
@@ -60,6 +63,5 @@ case $1 in
         usageRun
         exit 1
         ;;
-
 esac
 

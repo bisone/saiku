@@ -13,13 +13,11 @@ import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 /**
  * Created by bugg on 01/05/14.
  */
 public class UserService implements IUserManager, Serializable {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
-
     JdbcUserDAO uDAO;
 
     IDatasourceManager iDatasourceManager;
@@ -83,6 +81,10 @@ public class UserService implements IUserManager, Serializable {
         return uDAO.findByUserId(id);
     }
 
+    public SaikuUser getUser(String userName) {
+        return uDAO.findByUserName(userName);
+    }
+
     public String[] getRoles(SaikuUser user) {
         return uDAO.getRoles(user);
     }
@@ -118,7 +120,7 @@ public class UserService implements IUserManager, Serializable {
         log.debug("roles=" + roles);
         log.debug("adminRoles=" + adminRoles);
 
-        return !Collections.disjoint(roles, adminRoles);
+       return !Collections.disjoint(roles, adminRoles);
 
     }
 

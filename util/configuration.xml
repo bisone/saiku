@@ -26,126 +26,127 @@
      -
 -->
 <Repository>
-	<!--
-	<FileSystem class="org.apache.jackrabbit.core.fs.local.LocalFileSystem">
-		<param name="path" value="${rep.home}/repository" />
-	</FileSystem>
-	-->
-
-	<!--
-	Database File System (Cluster Configuration)
-
-	This is sample configuration for mysql persistence that can be used for
-	clustering Jackrabbit. For other databases, change the connection,
-	credentials, and schema settings.
-	-->
-
-	<FileSystem class="org.apache.jackrabbit.core.fs.db.DbFileSystem">
-		<param name="driver" value="com.mysql.jdbc.Driver"/>
-		<param name="url" value="jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8" />
-		<param name="user" value="sone" />
-		<param name="password" value="sone" />
-		<param name="schema" value="mysql"/>
-		<param name="schemaObjectPrefix" value="J_R_FS_"/>
-	</FileSystem>
-
-	<Security appName="Jackrabbit">
-		<AccessManager class="org.apache.jackrabbit.core.security.SimpleAccessManager" />
-		<LoginModule class="org.apache.jackrabbit.core.security.SimpleLoginModule">
-			<param name="anonymousId" value="anonymous" />
-		</LoginModule>
-	</Security>
-	<Workspaces rootPath="${rep.home}/workspaces" defaultWorkspace="default" />
-  <Workspace name="${wsp.name}">
     <!--
-        <FileSystem class="org.apache.jackrabbit.core.fs.local.LocalFileSystem">
-        <param name="path" value="${wsp.home}" />
-        </FileSystem>
-        <PersistenceManager class="org.apache.jackrabbit.core.state.xml.XMLPersistenceManager" />
+        virtual file system where the repository stores global state
+        (e.g. registered namespaces, custom node types, etc.)
     -->
-    <FileSystem class="org.apache.jackrabbit.core.fs.db.DbFileSystem">
-      <param name="driver" value="com.mysql.jdbc.Driver"/>
-      <param name="url" value="jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8" />
-      <param name="user" value="sone" />
-      <param name="password" value="sone" />
-      <param name="schema" value="mysql"/>
-      <param name="schemaObjectPrefix" value="J_FS_${wsp.name}_"/>
+    <FileSystem class="org.apache.jackrabbit.core.fs.local.LocalFileSystem">
+        <param name="path" value="${rep.home}/repository"/>
     </FileSystem>
 
-		<!--
-		Database File System and Persistence (Cluster Configuration)
+    <!--
+        data store configuration
+    -->
+    <DataStore class="org.apache.jackrabbit.core.data.FileDataStore"/>
 
-		This is sample configuration for mysql persistence that can be used for
-		clustering Jackrabbit. For other databases, change the  connection,
-		credentials, and schema settings.
-		-->
+    <!--
+        security configuration
+    -->
+    <Security appName="Jackrabbit">
+        <!--
+            security manager:
+            class: FQN of class implementing the JackrabbitSecurityManager interface
+        -->
+        <SecurityManager class="org.apache.jackrabbit.core.DefaultSecurityManager" workspaceName="security">
+            <!--
+            workspace access:
+            class: FQN of class implementing the WorkspaceAccessManager interface
+            -->
+            <!-- <WorkspaceAccessManager class="..."/> -->
+            <!-- <param name="config" value="${rep.home}/security.xml"/> -->
+        </SecurityManager>
 
-		<PersistenceManager class="org.apache.jackrabbit.core.state.db.SimpleDbPersistenceManager">
-			<param name="driver" value="com.mysql.jdbc.Driver"/>
-			<param name="url" value="jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8" />
-			<param name="user" value="sone" />
-			<param name="password" value="sone" />
-			<param name="schema" value="mysql"/>
-			<param name="schemaObjectPrefix" value="J_PM_${wsp.name}_" />
-			<param name="externalBLOBs" value="false" />
-		</PersistenceManager>
-		
-	</Workspace>
-	<Versioning rootPath="${rep.home}/version">
-		<!--
-		<FileSystem class="org.apache.jackrabbit.core.fs.local.LocalFileSystem">
-			<param name="path" value="${rep.home}/version" />
-		</FileSystem>
-		<PersistenceManager class="org.apache.jackrabbit.core.state.xml.XMLPersistenceManager" />
-		-->
+        <!--
+            access manager:
+            class: FQN of class implementing the AccessManager interface
+        -->
+        <AccessManager class="org.apache.jackrabbit.core.security.DefaultAccessManager">
+            <!-- <param name="config" value="${rep.home}/access.xml"/> -->
+        </AccessManager>
 
-		<!--
-		Database File System and Persistence (Cluster Configuration)
+        <LoginModule class="org.apache.jackrabbit.core.security.authentication.DefaultLoginModule">
+           <!-- 
+              anonymous user name ('anonymous' is the default value)
+            -->
+           <param name="anonymousId" value="anonymous"/>
+           <!--
+              administrator user id (default value if param is missing is 'admin')
+            -->
+           <param name="adminId" value="admin"/>
+        </LoginModule>
+    </Security>
 
-		This is sample configuration for mysql persistence that can be used for
-		clustering Jackrabbit. For other databases, change the connection,
-		credentials, and schema settings.
-		-->
+    <!--
+        location of workspaces root directory and name of default workspace
+    -->
+    <Workspaces rootPath="${rep.home}/workspaces" defaultWorkspace="default"/>
+    <!--
+        workspace configuration template:
+        used to create the initial workspace if there's no workspace yet
+    -->
+    <Workspace name="${wsp.name}">
+        <!--
+            virtual file system of the workspace:
+            class: FQN of class implementing the FileSystem interface
+        -->
+        <FileSystem class="org.apache.jackrabbit.core.fs.local.LocalFileSystem">
+            <param name="path" value="${wsp.home}"/>
+        </FileSystem>
+        <!--
+            persistence manager of the workspace:
+            class: FQN of class implementing the PersistenceManager interface
+        -->
+        <PersistenceManager class="org.apache.jackrabbit.core.persistence.pool.DerbyPersistenceManager">
+          <param name="url" value="jdbc:derby:${wsp.home}/db;create=true"/>
+          <param name="schemaObjectPrefix" value="${wsp.name}_"/>
+        </PersistenceManager>
+        <!--
+            Search index and the file system it uses.
+            class: FQN of class implementing the QueryHandler interface
+        -->
+        <SearchIndex class="org.apache.jackrabbit.core.query.lucene.SearchIndex">
+            <param name="path" value="${wsp.home}/index"/>
+            <param name="supportHighlighting" value="true"/>
+        </SearchIndex>
+    </Workspace>
 
-		<FileSystem class="org.apache.jackrabbit.core.fs.db.DbFileSystem">
-			<param name="driver" value="com.mysql.jdbc.Driver"/>
-			<param name="url" value="jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8" />
-			<param name="user" value="sone" />
-			<param name="password" value="sone" />
-			<param name="schema" value="mysql"/>
-			<param name="schemaObjectPrefix" value="J_V_FS_"/>
-		</FileSystem>
-		<PersistenceManager class="org.apache.jackrabbit.core.state.db.SimpleDbPersistenceManager">
-			<param name="driver" value="com.mysql.jdbc.Driver"/>
-			<param name="url" value="jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8" />
-			<param name="user" value="sone" />
-			<param name="password" value="sone" />
-			<param name="schema" value="mysql"/>
-			<param name="schemaObjectPrefix" value="J_V_PM_" />
-			<param name="externalBLOBs" value="false" />
-		</PersistenceManager>
-	</Versioning>
+    <!--
+        Configures the versioning
+    -->
+    <Versioning rootPath="${rep.home}/version">
+        <!--
+            Configures the filesystem to use for versioning for the respective
+            persistence manager
+        -->
+        <FileSystem class="org.apache.jackrabbit.core.fs.local.LocalFileSystem">
+            <param name="path" value="${rep.home}/version" />
+        </FileSystem>
 
-	<!--
-	Cluster Configuration
+        <!--
+            Configures the persistence manager to be used for persisting version state.
+            Please note that the current versioning implementation is based on
+            a 'normal' persistence manager, but this could change in future
+            implementations.
+        -->
+        <PersistenceManager class="org.apache.jackrabbit.core.persistence.pool.DerbyPersistenceManager">
+          <param name="url" value="jdbc:derby:${rep.home}/version/db;create=true"/>
+          <param name="schemaObjectPrefix" value="version_"/>
+        </PersistenceManager>
+    </Versioning>
 
-	This is sample configuration for mysql persistence that can be used for
-	clustering Jackrabbit. For other databases, change the  connection,
-	credentials, and schema settings.
-	-->
+    <!--
+        Search index for content that is shared repository wide
+        (/jcr:system tree, contains mainly versions)
+    -->
+    <SearchIndex class="org.apache.jackrabbit.core.query.lucene.SearchIndex">
+        <param name="path" value="${rep.home}/repository/index"/>
+        <param name="supportHighlighting" value="true"/>
+    </SearchIndex>
 
-	<!--
-    <Cluster id="node_1" syncDelay="5">
-		<Journal class="org.apache.jackrabbit.core.journal.DatabaseJournal">
-			<param name="revision" value="${rep.home}/revision"/>
-			<param name="driver" value="com.mysql.jdbc.Driver"/>
-			<param name="url" value="jdbc:mysql://mysql.test.local:3358/jackrabbit?characterEncoding=UTF-8" />
-			<param name="user" value="sone" />
-			<param name="password" value="sone" />
-			<param name="schema" value="mysql"/>
-			<param name="schemaObjectPrefix" value="J_C_"/>
-		</Journal>
+    <!--
+        Run with a cluster journal
+    -->
+    <Cluster id="node1">
+        <Journal class="org.apache.jackrabbit.core.journal.MemoryJournal"/>
     </Cluster>
-	-->
-
-</Repository> 
+</Repository>

@@ -450,6 +450,17 @@ public class AdminResource {
         return Response.ok().entity(userService.getUser(id)).build();
     }
 
+    @GET
+    @Produces( {"application/json"})
+    @Path("/user/{name}")
+    @ReturnType("org.saiku.database.dto.SaikuUser")
+    public Response getUserDetails(@PathParam("name") String name) {
+
+        SaikuUser user = userService.getUser(name);
+        user.setPassword("***");
+        return Response.ok().entity(user).build();
+    }
+
     /**
      * Update a users user details on the Saiku server.
      * @summary Update user details
