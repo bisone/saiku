@@ -5,11 +5,11 @@
   <parent>
     <groupId>org.saiku</groupId>
     <artifactId>saiku</artifactId>
-    <version>3.5</version>
+    <version>3.5.1</version>
   </parent>
   <groupId>com.github.bisone</groupId>
   <artifactId>obobd-web</artifactId>
-  <version>3.5</version>
+  <version>3.5.1</version>
   <packaging>war</packaging>
   <name>obobd-web Maven Webapp</name>
   <url>http://maven.apache.org</url>
